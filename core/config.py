@@ -8,16 +8,26 @@ load_dotenv()
 class Settings(BaseSettings):
 
     # RTSP URL
-    RTSP_URL: str = os.getenv("RTSP_URL","")
+    RTSP_URL_BASE: str = os.getenv("RTSP_URL_BASE", "")
+    CAMERA_CHANNELS: str = os.getenv("CAMERA_CHANNELS", "1")
 
     # Webhook URL
-    WEBHOOK_URL: str = os.getenv("WEBHOOK_URL","")
+    WEBHOOK_URL: str = os.getenv("WEBHOOK_URL", "")
 
-    @field_validator("RTSP_URL", "WEBHOOK_URL")
+    @field_validator("RTSP_URL_BASE", "WEBHOOK_URL")
     def not_empty(cls, v: str) -> str:
         if not v:
             raise ValueError("must not be empty")
         return v
+
+    @field_validator("CAMERA_CHANNELS")
+    def parse_camera_channels(cls, v: str) -> list[int]:
+        if not v:
+            raise ValueError("CAMERA_CHANNELS must not be empty")
+        try:
+            return [int(channel.strip()) for channel in v.split(',')]
+        except ValueError:
+            raise ValueError("CAMERA_CHANNELS must be a comma-separated list of integers")
     
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
