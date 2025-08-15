@@ -11,8 +11,8 @@ from core.logger import logger
 # --- CONFIG ---
 CHANNEL = 3
 RTSP_URL= settings.RTSP_URL+f"&channel={CHANNEL}&stream=0.sdp"
-COOLDOWN = 5  # seconds
-CLASS_NAME = "potted plant"
+COOLDOWN = 15  # seconds
+CLASS_NAME = "car"
 TARGET_FPS = 5
 
 # --- Init YOLO ---
