@@ -1,0 +1,7 @@
+pydantic
+pydantic-settings
+python-dotenv=1.1.1
+opencv-python
+requests
+ultralytics
+torch
