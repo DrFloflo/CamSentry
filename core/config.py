@@ -29,6 +29,10 @@ class Settings(BaseSettings):
         except ValueError:
             raise ValueError("CAMERA_CHANNELS must be a comma-separated list of integers")
     
+    # Performance
+    INFERENCE_WIDTH: int = int(os.getenv("INFERENCE_WIDTH", "640"))
+    FRAME_SKIP: int = int(os.getenv("FRAME_SKIP", "2"))
+
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     if ENVIRONMENT == "development":

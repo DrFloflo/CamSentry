@@ -13,11 +13,13 @@ from core.logger import logger
 # --- CONFIG ---
 COOLDOWN = 0  # seconds
 CLASS_NAMES = ["car", "truck", "person", "cat"]
-TARGET_FPS = 5
+TARGET_FPS = 4
 
 # --- Init YOLO ---
 model = YOLO("yolo11l.pt")
 device = "cuda" if torch.cuda.is_available() else "cpu"
+if device == "cuda":
+    model.half()
 logger.info(f"Using device: {device}")
 
 # --- Graceful Shutdown ---
@@ -41,6 +43,8 @@ def process_camera_stream(channel: int):
     logger.info(f"[Channel {channel}] Stream opened successfully.")
     last_sent = 0
     window_name = f"stream_channel_{channel}"
+    frame_count = 0
+    annotated = None
 
     try:
         while not stop_event.is_set():
@@ -53,38 +57,49 @@ def process_camera_stream(channel: int):
                 cap = cv2.VideoCapture(rtsp_url)
                 continue
 
-            # Détection
-            results = model(frame, verbose=False, device=device)[0]
-            annotated = results.plot()
+            frame_count += 1
+            # Process every Nth frame
+            if frame_count % settings.FRAME_SKIP == 0:
+                # Resize
+                height, width, _ = frame.shape
+                new_width = settings.INFERENCE_WIDTH
+                new_height = int(height * (new_width / width))
+                resized_frame = cv2.resize(frame, (new_width, new_height))
 
-            # Filtre classe
-            for box in results.boxes:
-                cls_name = model.names[int(box.cls)]
-                confidence = float(box.conf)
-                
-                if cls_name in CLASS_NAMES:
-                    logger.info(f"[Channel {channel}] Detected: {cls_name} with confidence {confidence:.2f}")
-                    # Cooldown
-                    now = time.time()
-                    if now - last_sent >= COOLDOWN:
-                        last_sent = now
+                # Détection
+                results = model(resized_frame, verbose=False, device=device)[0]
+                annotated = results.plot()
 
-                        # Encode image
-                        _, buffer = cv2.imencode('.jpg', annotated)
-                        b64_img = base64.b64encode(buffer).decode('utf-8')
+                # Filtre classe
+                for box in results.boxes:
+                    cls_name = model.names[int(box.cls)]
+                    confidence = float(box.conf)
+                    
+                    if cls_name in CLASS_NAMES:
+                        logger.info(f"[Channel {channel}] Detected: {cls_name} with confidence {confidence:.2f}")
+                        # Cooldown
+                        now = time.time()
+                        if now - last_sent >= COOLDOWN:
+                            last_sent = now
 
-                        # POST avec image en JSON
-                        try:
-                            payload = {"image": b64_img, "channel": channel}
-                            response = requests.post(settings.WEBHOOK_URL, json=payload, timeout=10)
-                            response.raise_for_status()
-                            logger.info(f"[Channel {channel}] Webhook envoyé")
-                        except requests.exceptions.RequestException as e:
-                            logger.error(f"[Channel {channel}] Erreur webhook: {e}")
+                            # Encode image
+                            _, buffer = cv2.imencode('.jpg', annotated)
+                            b64_img = base64.b64encode(buffer).decode('utf-8')
+
+                            # POST avec image en JSON
+                            try:
+                                payload = {"image": b64_img, "channel": channel}
+                                response = requests.post(settings.WEBHOOK_URL, json=payload, timeout=10)
+                                response.raise_for_status()
+                                logger.info(f"[Channel {channel}] Webhook envoyé")
+                            except requests.exceptions.RequestException as e:
+                                logger.error(f"[Channel {channel}] Erreur webhook: {e}")
 
             # Optionnel: affichage local
             if settings.ENVIRONMENT == "development":
-                cv2.imshow(window_name, annotated)
+                # Show the raw frame if we skipped processing
+                display_frame = annotated if annotated is not None else frame
+                cv2.imshow(window_name, display_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     stop_event.set()
                     break
