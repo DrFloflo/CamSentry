@@ -11,8 +11,8 @@ from core.config import settings
 from core.logger import logger
 
 # --- CONFIG ---
-COOLDOWN = 15  # seconds
-CLASS_NAME = "car"
+COOLDOWN = 0  # seconds
+CLASS_NAMES = ["car", "truck", "person", "cat"]
 TARGET_FPS = 5
 
 # --- Init YOLO ---
@@ -62,7 +62,7 @@ def process_camera_stream(channel: int):
                 cls_name = model.names[int(box.cls)]
                 confidence = float(box.conf)
                 
-                if cls_name == CLASS_NAME:
+                if cls_name in CLASS_NAMES:
                     logger.info(f"[Channel {channel}] Detected: {cls_name} with confidence {confidence:.2f}")
                     # Cooldown
                     now = time.time()
