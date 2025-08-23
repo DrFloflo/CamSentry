@@ -11,8 +11,8 @@ from core.config import settings
 from core.logger import logger
 
 # --- CONFIG ---
-COOLDOWN = 0  # seconds
-CLASS_NAMES = ["car", "truck", "person", "cat"]
+COOLDOWN = 2  # seconds
+CLASS_NAMES = ["person", "cat"]
 TARGET_FPS = 4
 
 # --- Init YOLO ---
