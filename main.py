@@ -16,11 +16,23 @@ CLASS_NAMES = ["person", "cat"]
 TARGET_FPS = 4
 
 # --- Init YOLO ---
-model = YOLO("yolo11l.pt")
+# For Jetson Nano, using a smaller model and a TensorRT engine is crucial for performance.
+# 1. Export your model to TensorRT: yolo export model=yolov8n.pt format=engine device=0
+# 2. This will create a 'yolov8n.engine' file.
+MODEL_PT = "yolov11n.pt"  # A smaller model is better for Jetson
+MODEL_ENGINE = "yolov11n.engine"
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
-if device == "cuda":
-    model.half()
 logger.info(f"Using device: {device}")
+
+try:
+    logger.info(f"Attempting to load TensorRT model: {MODEL_ENGINE}")
+    model = YOLO(MODEL_ENGINE)
+except Exception as e:
+    logger.warning(f"Could not load TensorRT model ({e}), falling back to PyTorch model: {MODEL_PT}")
+    model = YOLO(MODEL_PT)
+    if device == "cuda":
+        model.half() # FP16 is a good optimization for PyTorch models on GPU
 
 # --- Graceful Shutdown ---
 stop_event = threading.Event()
@@ -34,10 +46,20 @@ def process_camera_stream(channel: int):
     Processes a single camera stream.
     Captures video, performs object detection, and sends webhooks.
     """
+    # --- GStreamer Pipeline for Hardware-Accelerated Video Decoding ---
+    # Using a GStreamer pipeline with nvv4l2decoder leverages the Jetson's hardware decoder,
+    # significantly reducing CPU load compared to the default OpenCV backend.
     rtsp_url = settings.RTSP_URL_BASE + f"&channel={channel}&stream=0.sdp"
-    cap = cv2.VideoCapture(rtsp_url)
+    gstreamer_pipeline = (
+        f"rtspsrc location={rtsp_url} latency=0 ! "
+        "rtph264depay ! h264parse ! nvv4l2decoder ! "
+        "nvvidconv ! video/x-raw, format=(string)BGRx ! "
+        "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1"
+    )
+    cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
+
     if not cap.isOpened():
-        logger.error(f"[Channel {channel}] Impossible d'ouvrir le flux RTSP : {rtsp_url}")
+        logger.error(f"[Channel {channel}] Impossible d'ouvrir le flux RTSP avec GStreamer : {rtsp_url}")
         return
 
     logger.info(f"[Channel {channel}] Stream opened successfully.")
