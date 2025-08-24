@@ -68,7 +68,6 @@ def process_camera_stream(channel):
 
     logger.info("[Channel {}] Stream opened successfully.".format(channel))
     last_sent = 0
-    window_name = f"stream_channel_{channel}"
     frame_count = 0
     try:
         while not stop_event.is_set():
