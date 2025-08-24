@@ -104,7 +104,7 @@ def process_camera_stream(channel):
                 new_height = int(proc_h * (new_width / proc_w))
                 resized_frame = cv2.resize(processing_frame, (new_width, new_height))
 
-                # Détection
+                # Detection
                 results = model(resized_frame, verbose=False, device=device)[0]
 
                 # --- Draw detections on original frame for display ---
