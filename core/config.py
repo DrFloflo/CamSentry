@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List, Tuple
 
 from dotenv import load_dotenv
 from pydantic import field_validator, ValidationInfo
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
         return v
 
     @field_validator("CAMERA_CHANNELS")
-    def parse_camera_channels(cls, v: str) -> list[int]:
+    def parse_camera_channels(cls, v: str) -> List[int]:
         if not v:
             raise ValueError("CAMERA_CHANNELS must not be empty")
         try:
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
             raise ValueError("CAMERA_CHANNELS must be a comma-separated list of integers")
     
     @field_validator("CAMERA_ROIS")
-    def parse_camera_rois(cls, v: str, info: ValidationInfo) -> dict[int, tuple[int, int, int, int]]:
+    def parse_camera_rois(cls, v: str, info: ValidationInfo) -> Dict[int, Tuple[int, int, int, int]]:
         rois = {}
         if not v:
             return rois

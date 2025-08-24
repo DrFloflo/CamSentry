@@ -1,6 +1,8 @@
-# Cam-Detect: YOLOv11 RTSP Stream Processor
+# CamSentry: YOLOv11 RTSP Stream Processor
 
 Cam-Detect is a Python-based application designed to monitor and process multiple RTSP camera streams in real-time. It leverages the power of a YOLOv11 model to perform object detection, identifies specific classes (e.g., "person", "cat"), and triggers a webhook with an annotated image upon detection.
+
+Branch jetson-nano optimized for jetson P3450
 
 ## Features
 
