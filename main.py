@@ -20,7 +20,6 @@ TARGET_FPS = 4
 # --- Init YOLO ---
 # For Jetson Nano, using a smaller model and a TensorRT engine is crucial for performance.
 # 1. Export your model to TensorRT: yolo export model=yolov8n.pt format=engine device=0
-# 2. This will create a 'yolov8n.engine' file.
 MODEL_PT = "yolo11n.pt"  # A smaller model is better for Jetson
 MODEL_ENGINE = "yolo11n.engine"
 
@@ -56,10 +55,10 @@ def process_camera_stream(channel: int):
          cap = cv2.VideoCapture(rtsp_url)
     else:
         gstreamer_pipeline = (
-            f"rtspsrc location={rtsp_url} latency=0 ! "
-            "rtph264depay ! h264parse ! nvv4l2decoder ! "
-            "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-            "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1"
+            (f"rtspsrc location='{rtsp_url}' latency=0 ! "
+             "rtph264depay ! h264parse ! nvv4l2decoder ! "
+             "nvvidconv ! video/x-raw, format=(string)BGRx ! "
+             "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1")
         )
         cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
 
