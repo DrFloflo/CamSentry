@@ -1,8 +1,13 @@
 pydantic
 pydantic-settings
 python-dotenv
-opencv-python
+#opencv-python  Use the version on the container nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
 requests
 ultralytics
-torch
-ultralytics
+#torch Use the version on the container nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+fastapi
+uvicorn
+
+# sudo apt install gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+                 #gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+                 #gstreamer1.0-libav

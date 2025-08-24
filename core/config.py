@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings
 load_dotenv()
 class Settings(BaseSettings):
 
+    PLATFORM: str = os.getenv("PLATFORM", "linux")
+
     # RTSP URL
     RTSP_URL_BASE: str = os.getenv("RTSP_URL_BASE", "")
     CAMERA_CHANNELS: str = os.getenv("CAMERA_CHANNELS", "1")
@@ -65,6 +67,7 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     if ENVIRONMENT == "development":
         PRETTY_PRINT: bool = True
     else:

@@ -84,7 +84,7 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "": {
-            "level": "INFO",
+            "level": settings.LOG_LEVEL,
             "handlers": ["console"],
         }
     },

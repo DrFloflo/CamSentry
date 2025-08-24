@@ -9,6 +9,8 @@ import signal
 
 from core.config import settings
 from core.logger import logger
+from web import server as web_server
+import uvicorn
 
 # --- CONFIG ---
 COOLDOWN = 2  # seconds
@@ -19,8 +21,8 @@ TARGET_FPS = 4
 # For Jetson Nano, using a smaller model and a TensorRT engine is crucial for performance.
 # 1. Export your model to TensorRT: yolo export model=yolov8n.pt format=engine device=0
 # 2. This will create a 'yolov8n.engine' file.
-MODEL_PT = "yolov11n.pt"  # A smaller model is better for Jetson
-MODEL_ENGINE = "yolov11n.engine"
+MODEL_PT = "yolo11l.pt"  # A smaller model is better for Jetson
+MODEL_ENGINE = "yolo11n.engine"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
@@ -50,13 +52,16 @@ def process_camera_stream(channel: int):
     # Using a GStreamer pipeline with nvv4l2decoder leverages the Jetson's hardware decoder,
     # significantly reducing CPU load compared to the default OpenCV backend.
     rtsp_url = settings.RTSP_URL_BASE + f"&channel={channel}&stream=0.sdp"
-    gstreamer_pipeline = (
-        f"rtspsrc location={rtsp_url} latency=0 ! "
-        "rtph264depay ! h264parse ! nvv4l2decoder ! "
-        "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-        "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1"
-    )
-    cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
+    if settings.PLATFORM == "windows":
+         cap = cv2.VideoCapture(rtsp_url)
+    else:
+        gstreamer_pipeline = (
+            f"rtspsrc location={rtsp_url} latency=0 ! "
+            "rtph264depay ! h264parse ! nvv4l2decoder ! "
+            "nvvidconv ! video/x-raw, format=(string)BGRx ! "
+            "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1"
+        )
+        cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
 
     if not cap.isOpened():
         logger.error(f"[Channel {channel}] Impossible d'ouvrir le flux RTSP avec GStreamer : {rtsp_url}")
@@ -149,27 +154,31 @@ def process_camera_stream(channel: int):
                                 logger.error(f"[Channel {channel}] Webhook error: {e}")
                             break # Send webhook only once per detection cycle
 
-            # --- Display Logic ---
-            if settings.ENVIRONMENT == "development":
-                cv2.imshow(window_name, frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    stop_event.set()
-                    break
 
             # --- FPS Limiter ---
             elapsed_time = time.time() - loop_start_time
             sleep_time = (1 / TARGET_FPS) - elapsed_time
+
+            # Update web server frame
+            web_server.update_frame(frame)
+
             if sleep_time > 0:
                 time.sleep(sleep_time)
     finally:
         logger.info(f"[Channel {channel}] Cleaning up resources...")
         cap.release()
-        if settings.ENVIRONMENT == "development":
-            cv2.destroyWindow(window_name)
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    # Start FastAPI server in a separate thread
+    def run_web():
+        uvicorn.run(web_server.app, host="0.0.0.0", port=8000)
+
+    web_thread = threading.Thread(target=run_web, daemon=True)
+    web_thread.start()
+    logger.info("Web server started at http://0.0.0.0:8000")
 
     threads = []
     for channel in settings.CAMERA_CHANNELS:
