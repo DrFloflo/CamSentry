@@ -24,13 +24,13 @@ MODEL_PT = "yolo11n.pt"  # A smaller model is better for Jetson
 MODEL_ENGINE = "yolo11n.engine"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-logger.info(f"Using device: {device}")
+logger.info("Using device: {}".format(device))
 
 try:
-    logger.info(f"Attempting to load TensorRT model: {MODEL_ENGINE}")
+    logger.info("Attempting to load TensorRT model: {}".format(MODEL_ENGINE))
     model = YOLO(MODEL_ENGINE)
 except Exception as e:
-    logger.warning(f"Could not load TensorRT model ({e}), falling back to PyTorch model: {MODEL_PT}")
+    logger.warning("Could not load TensorRT model ({}), falling back to PyTorch model: {}".format(e, MODEL_PT))
     model = YOLO(MODEL_PT)
     if device == "cuda":
         model.half() # FP16 is a good optimization for PyTorch models on GPU
@@ -50,23 +50,23 @@ def process_camera_stream(channel: int):
     # --- GStreamer Pipeline for Hardware-Accelerated Video Decoding ---
     # Using a GStreamer pipeline with nvv4l2decoder leverages the Jetson's hardware decoder,
     # significantly reducing CPU load compared to the default OpenCV backend.
-    rtsp_url = settings.RTSP_URL_BASE + f"&channel={channel}&stream=0.sdp"
+    rtsp_url = settings.RTSP_URL_BASE + "&channel={}&stream=0.sdp".format(channel)
     if settings.PLATFORM == "windows":
          cap = cv2.VideoCapture(rtsp_url)
     else:
         gstreamer_pipeline = (
-            (f"rtspsrc location='{rtsp_url}' latency=0 ! "
-             "rtph264depay ! h264parse ! nvv4l2decoder ! "
-             "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-             "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1")
-        )
+            "rtspsrc location='{}' latency=0 ! "
+            "rtph264depay ! h264parse ! nvv4l2decoder ! "
+            "nvvidconv ! video/x-raw, format=(string)BGRx ! "
+            "videoconvert ! video/x-raw, format=(string)BGR ! appsink drop=1"
+        ).format(rtsp_url)
         cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
 
     if not cap.isOpened():
-        logger.error(f"[Channel {channel}] Impossible d'ouvrir le flux RTSP avec GStreamer : {rtsp_url}")
+        logger.error("[Channel {}] Impossible d'ouvrir le flux RTSP avec GStreamer : {}".format(channel, rtsp_url))
         return
 
-    logger.info(f"[Channel {channel}] Stream opened successfully.")
+    logger.info("[Channel {}] Stream opened successfully.".format(channel))
     last_sent = 0
     window_name = f"stream_channel_{channel}"
     frame_count = 0
@@ -75,7 +75,7 @@ def process_camera_stream(channel: int):
             loop_start_time = time.time()
             ret, frame = cap.read()
             if not ret:
-                logger.warning(f"[Channel {channel}] No frame received, retrying...")
+                logger.warning("[Channel {}] No frame received, retrying...".format(channel))
                 time.sleep(1)
                 cap.release()
                 cap = cv2.VideoCapture(rtsp_url)
@@ -127,7 +127,7 @@ def process_camera_stream(channel: int):
                         
                         cls_name = model.names[int(box.cls)]
                         confidence = float(box.conf)
-                        label = f"{cls_name} {confidence:.2f}"
+                        label = "{} {:.2f}".format(cls_name, confidence)
                         
                         cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), (0, 255, 0), 2)
                         cv2.putText(frame, label, (final_x1, final_y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
@@ -137,7 +137,7 @@ def process_camera_stream(channel: int):
                 for box in results.boxes:
                     cls_name = model.names[int(box.cls)]
                     if cls_name in CLASS_NAMES:
-                        logger.info(f"[Channel {channel}] Detected: {cls_name} with confidence {float(box.conf):.2f}")
+                        logger.info("[Channel {}] Detected: {} with confidence {:.2f}".format(channel, cls_name, float(box.conf)))
                         now = time.time()
                         if now - last_sent >= COOLDOWN:
                             last_sent = now
@@ -150,7 +150,7 @@ def process_camera_stream(channel: int):
                                 response.raise_for_status()
                                 logger.info(f"[Channel {channel}] Webhook sent")
                             except requests.exceptions.RequestException as e:
-                                logger.error(f"[Channel {channel}] Webhook error: {e}")
+                                logger.error("[Channel {}] Webhook error: {}".format(channel, e))
                             break # Send webhook only once per detection cycle
 
 
@@ -164,7 +164,7 @@ def process_camera_stream(channel: int):
             if sleep_time > 0:
                 time.sleep(sleep_time)
     finally:
-        logger.info(f"[Channel {channel}] Cleaning up resources...")
+        logger.info("[Channel {}] Cleaning up resources...".format(channel))
         cap.release()
 
 if __name__ == "__main__":
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         thread = threading.Thread(target=process_camera_stream, args=(channel,), daemon=True)
         threads.append(thread)
         thread.start()
-        logger.info(f"Started processing for camera channel {channel}")
+        logger.info("Started processing for camera channel {}".format(channel))
 
     try:
         # Keep the main thread alive while the worker threads are running
