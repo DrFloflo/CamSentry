@@ -42,7 +42,7 @@ def signal_handler(signum, frame):
     logger.info("Shutdown signal received. Stopping threads...")
     stop_event.set()
 
-def process_camera_stream(channel: int):
+def process_camera_stream(channel):
     """
     Processes a single camera stream.
     Captures video, performs object detection, and sends webhooks.
