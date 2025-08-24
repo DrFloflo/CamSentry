@@ -21,7 +21,7 @@ TARGET_FPS = 4
 # For Jetson Nano, using a smaller model and a TensorRT engine is crucial for performance.
 # 1. Export your model to TensorRT: yolo export model=yolov8n.pt format=engine device=0
 # 2. This will create a 'yolov8n.engine' file.
-MODEL_PT = "yolo11l.pt"  # A smaller model is better for Jetson
+MODEL_PT = "yolo11n.pt"  # A smaller model is better for Jetson
 MODEL_ENGINE = "yolo11n.engine"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

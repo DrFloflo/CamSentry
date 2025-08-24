@@ -17,7 +17,6 @@ def update_frame(frame):
     with frame_lock:
         latest_frame = frame.copy()
         frame_condition.notify_all() # Notify waiting generator
-    logger.debug("Frame updated for web server.")
 
 def frame_generator():
     """Generator that yields JPEG frames."""
