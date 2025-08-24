@@ -147,7 +147,7 @@ def process_camera_stream(channel):
                                 payload = {"image": b64_img, "channel": channel}
                                 response = requests.post(settings.WEBHOOK_URL, json=payload, timeout=10)
                                 response.raise_for_status()
-                                logger.info(f"[Channel {channel}] Webhook sent")
+                                logger.info("[Channel {}] Webhook sent".format(channel))
                             except requests.exceptions.RequestException as e:
                                 logger.error("[Channel {}] Webhook error: {}".format(channel, e))
                             break # Send webhook only once per detection cycle
