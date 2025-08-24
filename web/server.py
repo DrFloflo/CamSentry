@@ -1,8 +1,7 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, HTMLResponse
 import cv2
 import threading
-import time
 from core.logger import logger
 
 app = FastAPI()
