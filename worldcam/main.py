@@ -8,6 +8,10 @@ import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
+from ultralytics.nn.modules import head as ultralytics_head
+
+if not hasattr(ultralytics_head, "Pose26") and hasattr(ultralytics_head, "Pose"):
+    ultralytics_head.Pose26 = ultralytics_head.Pose
 
 
 def configure_ffmpeg_http_headers() -> None:
@@ -56,10 +60,29 @@ STATS_LOG_SECONDS = 5.0
 
 MODEL_PT = "yolo26l.pt"
 MODEL_ENGINE = "yolo26l.engine"
+POSE_MODEL_PT = "yolo26m-pose.pt"
+POSE_MODEL_ENGINE = "yolo26m-pose.engine"
 DEFAULT_CLASS_NAMES = {"person", "cat"}
 INFERENCE_WIDTH = 640
 FRAME_SKIP = 4
 DETECTION_COLOR = (0, 255, 0)
+POSE_KEYPOINT_COLOR = (255, 0, 255)
+POSE_SKELETON_COLOR = (255, 255, 0)
+POSE_CONFIDENCE_THRESHOLD = 0.30
+POSE_SKELETON = [
+    (5, 7),
+    (7, 9),
+    (6, 8),
+    (8, 10),
+    (5, 6),
+    (5, 11),
+    (6, 12),
+    (11, 12),
+    (11, 13),
+    (13, 15),
+    (12, 14),
+    (14, 16),
+]
 MENU_BACKGROUND_COLOR = (35, 35, 35)
 MENU_SELECTED_COLOR = (0, 255, 255)
 MENU_TEXT_COLOR = (255, 255, 255)
@@ -93,6 +116,20 @@ def load_yolo_model() -> tuple[YOLO, str]:
             model.half()
 
     return model, device
+
+
+def load_pose_model(device: str) -> YOLO:
+    """Load the YOLO pose model, preferring a TensorRT engine when available."""
+    try:
+        print(f"Chargement du modèle pose TensorRT: {POSE_MODEL_ENGINE}")
+        pose_model = YOLO(POSE_MODEL_ENGINE)
+    except Exception as exc:
+        print(f"TensorRT pose indisponible ({exc}); fallback vers le modèle PyTorch: {POSE_MODEL_PT}")
+        pose_model = YOLO(POSE_MODEL_PT)
+        if device == "cuda":
+            pose_model.half()
+
+    return pose_model
 
 
 def extract_yolo_detections(
@@ -153,6 +190,58 @@ def run_yolo_analysis(
     scale_x = frame_w / new_width
     scale_y = frame_h / new_height
     return extract_yolo_detections(results, model, scale_x, scale_y, selected_class_names)
+
+
+def extract_pose_keypoints(results, scale_x: float, scale_y: float) -> list[list[tuple[int, int, float]]]:
+    """Convert YOLO pose keypoints to original-frame coordinates."""
+    poses = []
+    keypoints = getattr(results, "keypoints", None)
+    if keypoints is None or keypoints.xy is None:
+        return poses
+
+    xy_values = keypoints.xy.cpu().numpy()
+    conf_values = keypoints.conf.cpu().numpy() if keypoints.conf is not None else None
+
+    for pose_index, pose_points in enumerate(xy_values):
+        pose = []
+        for keypoint_index, (x, y) in enumerate(pose_points):
+            confidence = 1.0 if conf_values is None else float(conf_values[pose_index][keypoint_index])
+            pose.append((int(x * scale_x), int(y * scale_y), confidence))
+        poses.append(pose)
+
+    return poses
+
+
+def draw_pose_detections(frame: np.ndarray, poses: list[list[tuple[int, int, float]]]) -> None:
+    """Draw pose keypoints and skeletons on the displayed frame."""
+    for pose in poses:
+        for point_a, point_b in POSE_SKELETON:
+            if point_a >= len(pose) or point_b >= len(pose):
+                continue
+
+            x1, y1, conf1 = pose[point_a]
+            x2, y2, conf2 = pose[point_b]
+            if conf1 < POSE_CONFIDENCE_THRESHOLD or conf2 < POSE_CONFIDENCE_THRESHOLD:
+                continue
+
+            cv2.line(frame, (x1, y1), (x2, y2), POSE_SKELETON_COLOR, 2)
+
+        for x, y, confidence in pose:
+            if confidence >= POSE_CONFIDENCE_THRESHOLD:
+                cv2.circle(frame, (x, y), 3, POSE_KEYPOINT_COLOR, -1)
+
+
+def run_pose_analysis(frame: np.ndarray, pose_model: YOLO, device: str) -> list[list[tuple[int, int, float]]]:
+    """Resize the frame, run YOLO pose inference, and return poses for the original frame."""
+    frame_h, frame_w, _ = frame.shape
+    new_width = min(INFERENCE_WIDTH, frame_w)
+    new_height = int(frame_h * (new_width / frame_w))
+    resized_frame = cv2.resize(frame, (new_width, new_height))
+
+    results = pose_model(resized_frame, verbose=False, device=device)[0]
+    scale_x = frame_w / new_width
+    scale_y = frame_h / new_height
+    return extract_pose_keypoints(results, scale_x, scale_y)
 
 
 def draw_fps(frame: np.ndarray, fps: float) -> None:
@@ -262,6 +351,7 @@ def main() -> None:
     print_videoio_diagnostics(stream_url)
 
     model, device = load_yolo_model()
+    pose_model = load_pose_model(device)
     cap = open_with_opencv(stream_url)
     ffmpeg_process = None
 
@@ -284,6 +374,7 @@ def main() -> None:
     last_frame_at = time.perf_counter()
     current_fps = 0.0
     latest_detections: list[tuple[int, int, int, int, str]] = []
+    latest_poses: list[list[tuple[int, int, float]]] = []
     class_names = [model.names[index] for index in sorted(model.names)]
     selected_class_names = {class_name for class_name in DEFAULT_CLASS_NAMES if class_name in class_names}
     menu_open = False
@@ -327,7 +418,13 @@ def main() -> None:
             except Exception as exc:
                 print(f"Erreur pendant l'analyse YOLO26L: {exc}")
 
+            try:
+                latest_poses = run_pose_analysis(frame, pose_model, device)
+            except Exception as exc:
+                print(f"Erreur pendant l'analyse de pose YOLO: {exc}")
+
         draw_yolo_detections(frame, latest_detections)
+        draw_pose_detections(frame, latest_poses)
         draw_fps(frame, current_fps)
         if menu_open:
             draw_class_menu(frame, class_names, selected_class_names, menu_index, menu_scroll)
@@ -371,6 +468,7 @@ def main() -> None:
         ffmpeg_process.wait(timeout=5)
     if device == "cuda":
         del model
+        del pose_model
         torch.cuda.empty_cache()
     cv2.destroyAllWindows()
 
