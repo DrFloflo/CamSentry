@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+from worldcam.models import run_model_inference
 from worldcam.config import (
     INFERENCE_WIDTH,
     POSE_CONFIDENCE_THRESHOLD,
@@ -43,7 +44,7 @@ def run_pose_analysis(frame: np.ndarray, pose_model: YOLO, device: str) -> list[
     new_height = int(frame_h * (new_width / frame_w))
     resized_frame = cv2.resize(frame, (new_width, new_height))
 
-    results = pose_model(resized_frame, verbose=False, device=device)[0]
+    results = run_model_inference(pose_model, resized_frame, device)
     scale_x = frame_w / new_width
     scale_y = frame_h / new_height
     return extract_pose_keypoints(results, scale_x, scale_y)

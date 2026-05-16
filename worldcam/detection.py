@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from worldcam.config import DETECTION_COLOR, INFERENCE_WIDTH
+from worldcam.config import DETECTION_CLASS_COLORS, DETECTION_COLOR, DETECTION_FALLBACK_COLORS, INFERENCE_WIDTH
+from worldcam.models import run_model_inference
 
 Detection = tuple[int, int, int, int, str]
 
@@ -48,22 +49,32 @@ def run_yolo_analysis(
     new_height = int(frame_h * (new_width / frame_w))
     resized_frame = cv2.resize(frame, (new_width, new_height))
 
-    results = model(resized_frame, verbose=False, device=device)[0]
+    results = run_model_inference(model, resized_frame, device)
     scale_x = frame_w / new_width
     scale_y = frame_h / new_height
     return extract_yolo_detections(results, model, scale_x, scale_y, selected_class_names)
 
 
+def get_detection_color(label: str) -> tuple[int, int, int]:
+    """Return a stable display color for a detection class label."""
+    class_name = label.rsplit(" ", 1)[0]
+    if class_name in DETECTION_CLASS_COLORS:
+        return DETECTION_CLASS_COLORS[class_name]
+    color_index = sum(ord(character) for character in class_name) % len(DETECTION_FALLBACK_COLORS)
+    return DETECTION_FALLBACK_COLORS[color_index]
+
+
 def draw_yolo_detections(frame: np.ndarray, detections: list[Detection]) -> None:
     """Draw the latest YOLO detections on the displayed frame."""
     for final_x1, final_y1, final_x2, final_y2, label in detections:
-        cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), DETECTION_COLOR, 2)
+        color = get_detection_color(label)
+        cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), color, 2)
         cv2.putText(
             frame,
             label,
             (final_x1, max(final_y1 - 10, 20)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
-            DETECTION_COLOR,
+            color,
             2,
         )

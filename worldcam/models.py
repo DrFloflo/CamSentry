@@ -5,11 +5,13 @@ import importlib.metadata
 import platform
 import sys
 
+import numpy as np
 import torch
 from ultralytics import YOLO
 
 from worldcam.compat import patch_ultralytics_pose26
 from worldcam.config import (
+    INFERENCE_WIDTH,
     MODEL_ENGINE,
     MODEL_ONNX,
     MODEL_PT,
@@ -55,9 +57,24 @@ def describe_tensorrt_runtime_error(exc: Exception) -> str:
     return "\n  ".join(diagnostic_lines)
 
 
-def warm_up_model_metadata(model: YOLO) -> None:
-    """Force Ultralytics to initialize the backend now, so fallback happens during loading."""
+def is_tensorrt_model(model: YOLO) -> bool:
+    """Return whether this YOLO instance was loaded from a TensorRT engine."""
+    return getattr(model, "_worldcam_backend_name", None) == "TensorRT"
+
+
+def run_model_inference(model: YOLO, image: np.ndarray, device: str):
+    """Run inference without forcing device selection for TensorRT engines."""
+    if is_tensorrt_model(model):
+        return model(image, verbose=False)[0]
+    return model(image, verbose=False, device=device)[0]
+
+
+def warm_up_model(model: YOLO, label: str, device: str) -> None:
+    """Force Ultralytics to initialize metadata and the inference backend during loading."""
     _ = model.names
+    dummy_image = np.zeros((INFERENCE_WIDTH, INFERENCE_WIDTH, 3), dtype=np.uint8)
+    print(f"Initialisation {label}...")
+    run_model_inference(model, dummy_image, device)
 
 
 def load_backend_model(label: str, candidates: list[tuple[str, str]], device: str) -> YOLO:
@@ -68,9 +85,10 @@ def load_backend_model(label: str, candidates: list[tuple[str, str]], device: st
         try:
             print(f"Chargement {label} via {backend_name}: {model_path}")
             model = YOLO(model_path)
-            warm_up_model_metadata(model)
+            setattr(model, "_worldcam_backend_name", backend_name)
             if backend_name == "PyTorch" and device == "cuda":
                 model.half()
+            warm_up_model(model, label, device)
             return model
         except Exception as exc:
             last_error = exc

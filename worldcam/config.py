@@ -7,7 +7,7 @@ STREAM_URL = (
 
 OUTPUT_WIDTH = 1280
 OUTPUT_HEIGHT = 720
-TARGET_FPS = 25
+TARGET_FPS = 20
 FRAME_INTERVAL = 1.0 / TARGET_FPS
 FRAME_SIZE = OUTPUT_WIDTH * OUTPUT_HEIGHT * 3
 READ_WARN_SECONDS = 0.25
@@ -19,11 +19,30 @@ MODEL_ENGINE = "yolo26l.engine"
 POSE_MODEL_PT = "yolo26m-pose.pt"
 POSE_MODEL_ONNX = "yolo26m-pose.onnx"
 POSE_MODEL_ENGINE = "yolo26m-pose.engine"
-DEFAULT_CLASS_NAMES = {"person", "cat"}
+DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck"}
 INFERENCE_WIDTH = 640
 FRAME_SKIP = 4
 
 DETECTION_COLOR = (0, 255, 0)
+DETECTION_CLASS_COLORS = {
+    "person": (0, 255, 0),
+    "bicycle": (255, 180, 0),
+    "car": (0, 165, 255),
+    "motorcycle": (255, 0, 0),
+    "bus": (0, 255, 255),
+    "truck": (255, 0, 255),
+    "cat": (180, 105, 255),
+}
+DETECTION_FALLBACK_COLORS = [
+    (0, 255, 0),
+    (255, 180, 0),
+    (0, 165, 255),
+    (255, 0, 0),
+    (0, 255, 255),
+    (255, 0, 255),
+    (180, 105, 255),
+    (255, 255, 0),
+]
 POSE_KEYPOINT_COLOR = (255, 0, 255)
 POSE_SKELETON_COLOR = (255, 255, 0)
 POSE_CONFIDENCE_THRESHOLD = 0.30

@@ -67,24 +67,35 @@ def read_stream_frame(
 def run_model_analysis(
     frame,
     model: YOLO,
-    pose_model: YOLO,
+    pose_model: YOLO | None,
     device: str,
     selected_class_names: set[str],
     latest_detections: list[Detection],
     latest_poses: list[Pose],
-) -> tuple[list[Detection], list[Pose]]:
-    """Run object and pose analysis while preserving previous results on errors."""
+    pose_enabled: bool,
+) -> tuple[list[Detection], list[Pose], YOLO | None]:
+    """Run object and optional pose analysis while preserving previous results on errors."""
     try:
         latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
     except Exception as exc:
         print(f"Erreur pendant l'analyse YOLO26L: {exc}")
+
+    if not pose_enabled:
+        return latest_detections, [], pose_model
+
+    if pose_model is None:
+        try:
+            pose_model = load_pose_model(device)
+        except Exception as exc:
+            print(f"Erreur pendant le chargement du modèle pose YOLO: {exc}")
+            return latest_detections, latest_poses, pose_model
 
     try:
         latest_poses = run_pose_analysis(frame, pose_model, device)
     except Exception as exc:
         print(f"Erreur pendant l'analyse de pose YOLO: {exc}")
 
-    return latest_detections, latest_poses
+    return latest_detections, latest_poses, pose_model
 
 
 def draw_overlay(
@@ -118,7 +129,7 @@ def cleanup_resources(
     cap: cv2.VideoCapture | None,
     ffmpeg_process: subprocess.Popen | None,
     model: YOLO,
-    pose_model: YOLO,
+    pose_model: YOLO | None,
     device: str,
 ) -> None:
     """Release stream, model, and OpenCV resources."""
@@ -129,7 +140,8 @@ def cleanup_resources(
         ffmpeg_process.wait(timeout=5)
     if device == "cuda":
         del model
-        del pose_model
+        if pose_model is not None:
+            del pose_model
         torch.cuda.empty_cache()
     cv2.destroyAllWindows()
 
@@ -140,7 +152,7 @@ def main() -> None:
     print_videoio_diagnostics(STREAM_URL)
 
     model, device = load_yolo_model()
-    pose_model = load_pose_model(device)
+    pose_model = None
 
     try:
         cap, ffmpeg_process = open_stream(STREAM_URL)
@@ -192,7 +204,7 @@ def main() -> None:
                 last_stats_at = now
 
             if frame_count % FRAME_SKIP == 0:
-                latest_detections, latest_poses = run_model_analysis(
+                latest_detections, latest_poses, pose_model = run_model_analysis(
                     frame,
                     model,
                     pose_model,
@@ -200,6 +212,7 @@ def main() -> None:
                     selected_class_names,
                     latest_detections,
                     latest_poses,
+                    menu_state.pose_enabled,
                 )
 
             draw_overlay(
@@ -218,7 +231,10 @@ def main() -> None:
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            if handle_class_menu_key(key, class_names, selected_class_names, menu_state):
+            class_selection_changed, pose_toggled = handle_class_menu_key(key, class_names, selected_class_names, menu_state)
+            if class_selection_changed:
                 latest_detections = []
+            if pose_toggled and not menu_state.pose_enabled:
+                latest_poses = []
     finally:
         cleanup_resources(cap, ffmpeg_process, model, pose_model, device)
