@@ -7,6 +7,7 @@ ultralytics
 #torch Use the version on the container nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
 fastapi
 uvicorn
+isort
 
 # TensorRT Python wheels are runtime-specific. On Windows, use Python 3.12 or lower
 # with matching NVIDIA packages; Python 3.13 can install an incomplete package set
