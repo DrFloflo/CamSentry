@@ -1,0 +1,1 @@
+"""WorldCam video analysis package."""
