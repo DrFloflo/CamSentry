@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import time
 from urllib.parse import urlparse
 
 import cv2
@@ -45,7 +46,11 @@ stream_url = "https://videos-3.earthcam.com/fecnetwork/24322.flv/playlist.m3u8?t
 
 OUTPUT_WIDTH = 1280
 OUTPUT_HEIGHT = 720
+TARGET_FPS = 25
+FRAME_INTERVAL = 1.0 / TARGET_FPS
 FRAME_SIZE = OUTPUT_WIDTH * OUTPUT_HEIGHT * 3
+READ_WARN_SECONDS = 0.25
+STATS_LOG_SECONDS = 5.0
 
 FFMPEG_HEADERS = "\r\n".join(
     [
@@ -82,13 +87,18 @@ def start_ffmpeg_pipe(url: str) -> subprocess.Popen:
         "-hide_banner",
         "-loglevel",
         "error",
+        "-fflags",
+        "nobuffer",
+        "-flags",
+        "low_delay",
+        "-re",
         "-headers",
         FFMPEG_HEADERS,
         "-i",
         url,
         "-an",
         "-vf",
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}",
+        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},fps={TARGET_FPS}",
         "-pix_fmt",
         "bgr24",
         "-f",
@@ -121,33 +131,62 @@ def main() -> None:
     if cap is None:
         try:
             ffmpeg_process = start_ffmpeg_pipe(stream_url)
-            print("Connexion réussie via ffmpeg.exe. Analyse en cours... Appuyez sur 'q' pour quitter.")
+            print(f"Connexion réussie via ffmpeg.exe. Lecture stabilisée à {TARGET_FPS} FPS. Appuyez sur 'q' pour quitter.")
         except RuntimeError as exc:
             print(f"Erreur : {exc}")
             return
     else:
         print("Analyse en cours... Appuyez sur 'q' pour quitter.")
 
+    frame_count = 0
+    slow_reads = 0
+    started_at = time.perf_counter()
+    last_stats_at = started_at
+
+    next_frame_at = time.perf_counter()
+
     while True:
+        read_started_at = time.perf_counter()
         if cap is not None:
             ret, frame = cap.read()
         else:
             ret, frame = read_ffmpeg_frame(ffmpeg_process)
+        read_duration = time.perf_counter() - read_started_at
+
+        if read_duration > READ_WARN_SECONDS:
+            slow_reads += 1
+            print(f"Lecture lente: {read_duration:.3f}s pour récupérer une frame.")
 
         if not ret:
             print("Erreur : Impossible de recevoir la frame.")
             break
 
+        frame_count += 1
+        now = time.perf_counter()
+        if now - last_stats_at >= STATS_LOG_SECONDS:
+            elapsed = now - started_at
+            fps = frame_count / elapsed if elapsed > 0 else 0.0
+            print(
+                f"Stats flux: frames={frame_count}, fps_moyen={fps:.1f}, "
+                f"lectures_lentes={slow_reads}, derniere_lecture={read_duration:.3f}s"
+            )
+            last_stats_at = now
+
         # ---------------------------------------------------------
         # ZONE DE VOTRE ANALYSE D'IMAGE
-        # Exemple simple : Conversion en niveaux de gris (GrayScale)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
         # Vous pouvez injecter ici votre modèle YOLO, détection de mouvement, etc.
         # ---------------------------------------------------------
 
-        # Affichage du résultat
-        cv2.imshow('Analyse Image - Dublin Cam', gray)
+        # Stabilisation de l'affichage: ne pas rattraper les frames en accéléré
+        now = time.perf_counter()
+        if now < next_frame_at:
+            time.sleep(next_frame_at - now)
+        elif now - next_frame_at > FRAME_INTERVAL:
+            next_frame_at = now
+        next_frame_at += FRAME_INTERVAL
+
+        # Affichage couleur du résultat
+        cv2.imshow('Analyse Image - Dublin Cam', frame)
 
         # Quitter avec la touche 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):
