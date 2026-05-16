@@ -17,10 +17,11 @@ Branch jetson-nano optimized for jetson P3450
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.8.10
 - `pip` for package management
 - A compatible YOLOv11 model file (e.g., `yolo11l.pt`)
-- Pytorch for you specific CUDA version
+- Pytorch for your specific CUDA version
+- If Jetson nano P3450 : No venv in the container
 
 ## Installation
 
