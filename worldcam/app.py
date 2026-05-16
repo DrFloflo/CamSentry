@@ -16,8 +16,9 @@ from worldcam.config import (
     STREAM_URL,
     TARGET_FPS,
 )
-from worldcam.detection import Detection, draw_yolo_detections, run_yolo_analysis
-from worldcam.models import load_pose_model, load_yolo_model
+from worldcam.config import SAHI_ENABLED
+from worldcam.detection import Detection, draw_yolo_detections, run_sahi_analysis, run_yolo_analysis
+from worldcam.models import load_pose_model, load_sahi_model, load_yolo_model
 from worldcam.pose import Pose, draw_pose_detections, run_pose_analysis
 from worldcam.streaming import (
     configure_ffmpeg_http_headers,
@@ -73,10 +74,15 @@ def run_model_analysis(
     latest_detections: list[Detection],
     latest_poses: list[Pose],
     pose_enabled: bool,
+    sahi_model=None,
+    sahi_enabled: bool = False,
 ) -> tuple[list[Detection], list[Pose], YOLO | None]:
     """Run object and optional pose analysis while preserving previous results on errors."""
     try:
-        latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
+        if sahi_enabled and sahi_model is not None:
+            latest_detections = run_sahi_analysis(frame, sahi_model, selected_class_names)
+        else:
+            latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
     except Exception as exc:
         print(f"Erreur pendant l'analyse YOLO26L: {exc}")
 
@@ -152,6 +158,7 @@ def main() -> None:
     print_videoio_diagnostics(STREAM_URL)
 
     model, device = load_yolo_model()
+    sahi_model = load_sahi_model(device) if SAHI_ENABLED else None
     pose_model = None
 
     try:
@@ -213,6 +220,8 @@ def main() -> None:
                     latest_detections,
                     latest_poses,
                     menu_state.pose_enabled,
+                    sahi_model,
+                    menu_state.sahi_enabled,
                 )
 
             draw_overlay(
@@ -231,8 +240,14 @@ def main() -> None:
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            class_selection_changed, pose_toggled = handle_class_menu_key(key, class_names, selected_class_names, menu_state)
-            if class_selection_changed:
+            class_selection_changed, pose_toggled, sahi_toggled = handle_class_menu_key(key, class_names, selected_class_names, menu_state)
+            if sahi_toggled and menu_state.sahi_enabled and sahi_model is None:
+                try:
+                    sahi_model = load_sahi_model(device)
+                except Exception as exc:
+                    menu_state.sahi_enabled = False
+                    print(f"Erreur pendant le chargement du modèle SAHI: {exc}")
+            if class_selection_changed or sahi_toggled:
                 latest_detections = []
             if pose_toggled and not menu_state.pose_enabled:
                 latest_poses = []

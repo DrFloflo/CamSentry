@@ -4,6 +4,7 @@ python-dotenv
 #opencv-python  Use the version on the container nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
 requests
 ultralytics
+sahi
 #torch Use the version on the container nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
 fastapi
 uvicorn

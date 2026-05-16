@@ -11,6 +11,7 @@ from worldcam.config import (
     MENU_PAGE_SIZE,
     MENU_SELECTED_COLOR,
     MENU_TEXT_COLOR,
+    SAHI_ENABLED,
 )
 
 
@@ -22,6 +23,7 @@ class MenuState:
     index: int = 0
     scroll: int = 0
     pose_enabled: bool = False
+    sahi_enabled: bool = SAHI_ENABLED
 
 
 def draw_fps(frame: np.ndarray, fps: float) -> None:
@@ -49,20 +51,23 @@ def draw_class_menu(
     menu_y = 16
     menu_width = 360
     line_height = 24
-    menu_height = 116 + (MENU_PAGE_SIZE * line_height)
+    menu_height = 140 + (MENU_PAGE_SIZE * line_height)
 
     cv2.rectangle(frame, (menu_x, menu_y), (menu_x + menu_width, menu_y + menu_height), MENU_BACKGROUND_COLOR, -1)
     cv2.rectangle(frame, (menu_x, menu_y), (menu_x + menu_width, menu_y + menu_height), MENU_SELECTED_COLOR, 1)
     cv2.putText(frame, "Menu analyse - M fermer", (menu_x + 12, menu_y + 26), cv2.FONT_HERSHEY_SIMPLEX, 0.6, MENU_SELECTED_COLOR, 2)
-    cv2.putText(frame, "Haut/Bas: classes | Espace: cocher | P: pose", (menu_x + 12, menu_y + 52), cv2.FONT_HERSHEY_SIMPLEX, 0.42, MENU_TEXT_COLOR, 1)
+    cv2.putText(frame, "Haut/Bas: classes | Espace: cocher | P: pose | A: SAHI", (menu_x + 12, menu_y + 52), cv2.FONT_HERSHEY_SIMPLEX, 0.42, MENU_TEXT_COLOR, 1)
     pose_label = "[x] Pose" if menu_state.pose_enabled else "[ ] Pose"
     pose_color = MENU_ENABLED_COLOR if menu_state.pose_enabled else MENU_TEXT_COLOR
     cv2.putText(frame, pose_label, (menu_x + 12, menu_y + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.55, pose_color, 1)
+    sahi_label = "[x] SAHI" if menu_state.sahi_enabled else "[ ] SAHI"
+    sahi_color = MENU_ENABLED_COLOR if menu_state.sahi_enabled else MENU_TEXT_COLOR
+    cv2.putText(frame, sahi_label, (menu_x + 12, menu_y + 104), cv2.FONT_HERSHEY_SIMPLEX, 0.55, sahi_color, 1)
 
     visible_classes = class_names[menu_state.scroll:menu_state.scroll + MENU_PAGE_SIZE]
     for visible_index, class_name in enumerate(visible_classes):
         class_index = menu_state.scroll + visible_index
-        y = menu_y + 108 + (visible_index * line_height)
+        y = menu_y + 132 + (visible_index * line_height)
         is_current = class_index == menu_state.index
         is_enabled = class_name in selected_class_names
         cursor = ">" if is_current else " "
@@ -76,18 +81,22 @@ def handle_class_menu_key(
     class_names: list[str],
     selected_class_names: set[str],
     menu_state: MenuState,
-) -> tuple[bool, bool]:
-    """Update menu state and return class-change and pose-toggle flags."""
+) -> tuple[bool, bool, bool]:
+    """Update menu state and return class-change, pose-toggle, and SAHI-toggle flags."""
     if key == ord("m"):
         menu_state.is_open = not menu_state.is_open
-        return False, False
+        return False, False, False
 
     if not menu_state.is_open:
-        return False, False
+        return False, False, False
 
     if key == ord("p"):
         menu_state.pose_enabled = not menu_state.pose_enabled
-        return False, True
+        return False, True, False
+
+    if key == ord("a"):
+        menu_state.sahi_enabled = not menu_state.sahi_enabled
+        return False, False, True
 
     if key in (82, ord("z"), ord("w")):
         menu_state.index = max(0, menu_state.index - 1)
@@ -103,6 +112,6 @@ def handle_class_menu_key(
             selected_class_names.remove(class_name)
         else:
             selected_class_names.add(class_name)
-        return True, False
+        return True, False, False
 
-    return False, False
+    return False, False, False
