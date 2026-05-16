@@ -7,7 +7,6 @@ import sys
 
 import numpy as np
 import torch
-from sahi import AutoDetectionModel
 from ultralytics import YOLO
 
 from worldcam.compat import patch_ultralytics_pose26
@@ -16,8 +15,6 @@ from worldcam.config import (
     MODEL_ENGINE,
     MODEL_ONNX,
     MODEL_PT,
-    SAHI_CONFIDENCE_THRESHOLD,
-    SAHI_MODEL_PATH,
     POSE_MODEL_ENGINE,
     POSE_MODEL_ONNX,
     POSE_MODEL_PT,
@@ -115,17 +112,6 @@ def load_yolo_model() -> tuple[YOLO, str]:
         device,
     )
     return model, device
-
-
-def load_sahi_model(device: str):
-    """Load a SAHI-wrapped Ultralytics model for tiled inference."""
-    print(f"Chargement SAHI via Ultralytics: {SAHI_MODEL_PATH}")
-    return AutoDetectionModel.from_pretrained(
-        model_type="ultralytics",
-        model_path=SAHI_MODEL_PATH,
-        confidence_threshold=SAHI_CONFIDENCE_THRESHOLD,
-        device=device,
-    )
 
 
 def load_pose_model(device: str) -> YOLO:

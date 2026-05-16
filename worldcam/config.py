@@ -21,7 +21,7 @@ POSE_MODEL_ONNX = "yolo26m-pose.onnx"
 POSE_MODEL_ENGINE = "yolo26m-pose.engine"
 DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck"}
 INFERENCE_WIDTH = 640
-FRAME_SKIP = 4
+FRAME_SKIP = 6
 
 SAHI_ENABLED = True
 SAHI_MODEL_PATH = MODEL_PT
