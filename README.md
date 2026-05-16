@@ -36,6 +36,18 @@ Branch jetson-nano optimized for jetson P3450
     pip install -r requirements.txt
     ```
 
+    For TensorRT `.engine` inference on Windows, use a Python 3.12 venv and install the NVIDIA TensorRT stack from NVIDIA's package index:
+
+    ```powershell
+    py -3.12 -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+    python -m pip install --extra-index-url https://pypi.nvidia.com "tensorrt==10.8.0.43"
+    ```
+
+    Python 3.13 can install an incomplete TensorRT package set where `tensorrt_bindings.tensorrt` is missing. If TensorRT cannot load, the WorldCam app logs a runtime diagnostic and falls back from `.engine` to `.onnx`, then `.pt`.
+
 3.  **Download YOLOv11 Model:**
     Place your trained YOLOv11 model file (e.g., `yolo11l.pt`) in the root directory of the project.
 

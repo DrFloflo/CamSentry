@@ -14,8 +14,10 @@ READ_WARN_SECONDS = 0.25
 STATS_LOG_SECONDS = 5.0
 
 MODEL_PT = "yolo26l.pt"
+MODEL_ONNX = "yolo26l.onnx"
 MODEL_ENGINE = "yolo26l.engine"
 POSE_MODEL_PT = "yolo26m-pose.pt"
+POSE_MODEL_ONNX = "yolo26m-pose.onnx"
 POSE_MODEL_ENGINE = "yolo26m-pose.engine"
 DEFAULT_CLASS_NAMES = {"person", "cat"}
 INFERENCE_WIDTH = 640

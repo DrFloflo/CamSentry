@@ -8,6 +8,13 @@ ultralytics
 fastapi
 uvicorn
 
+# TensorRT Python wheels are runtime-specific. On Windows, use Python 3.12 or lower
+# with matching NVIDIA packages; Python 3.13 can install an incomplete package set
+# where `tensorrt_bindings.tensorrt` is missing at runtime.
+# Recommended Windows CUDA 12 stack, installed manually in a compatible venv:
+# python -m pip install --extra-index-url https://pypi.nvidia.com "tensorrt==10.8.0.43"
+# Do not install the legacy `tensorrt-bindings` package directly.
+
 # sudo apt install gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
                  #gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
                  #gstreamer1.0-libav

@@ -3,5 +3,5 @@ __pycache__/
 .env
 .vscode
 yolo11*
-yolo26l.pt
-yolo26m-pose.pt
+yolo26*
+.gitignore
