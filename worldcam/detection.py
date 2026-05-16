@@ -16,7 +16,7 @@ from worldcam.config import (
 )
 from worldcam.models import run_model_inference
 
-Detection = tuple[int, int, int, int, str]
+Detection = tuple[int, int, int, int, str, float]
 
 
 def extract_yolo_detections(
@@ -41,7 +41,7 @@ def extract_yolo_detections(
         final_x2 = int(x2 * scale_x)
         final_y2 = int(y2 * scale_y)
         label = f"{cls_name} {confidence:.2f}"
-        detections.append((final_x1, final_y1, final_x2, final_y2, label))
+        detections.append((final_x1, final_y1, final_x2, final_y2, label, confidence))
 
     return detections
 
@@ -95,7 +95,7 @@ def run_sahi_analysis(
         y2 = max(0, min(frame_h - 1, int(bbox.maxy)))
         confidence = float(prediction.score.value)
         label = f"{cls_name} {confidence:.2f}"
-        detections.append((x1, y1, x2, y2, label))
+        detections.append((x1, y1, x2, y2, label, confidence))
 
     return detections
 
@@ -109,9 +109,11 @@ def get_detection_color(label: str) -> tuple[int, int, int]:
     return DETECTION_FALLBACK_COLORS[color_index]
 
 
-def draw_yolo_detections(frame: np.ndarray, detections: list[Detection]) -> None:
-    """Draw the latest YOLO detections on the displayed frame."""
-    for final_x1, final_y1, final_x2, final_y2, label in detections:
+def draw_yolo_detections(frame: np.ndarray, detections: list[Detection], display_threshold: float = 0.5) -> None:
+    """Draw the latest YOLO detections that meet the display confidence threshold."""
+    for final_x1, final_y1, final_x2, final_y2, label, confidence in detections:
+        if confidence < display_threshold:
+            continue
         color = get_detection_color(label)
         cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), color, 2)
         cv2.putText(
