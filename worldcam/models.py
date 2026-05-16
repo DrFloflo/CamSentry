@@ -18,6 +18,9 @@ from worldcam.config import (
     POSE_MODEL_ENGINE,
     POSE_MODEL_ONNX,
     POSE_MODEL_PT,
+    SEGMENTATION_MODEL_ENGINE,
+    SEGMENTATION_MODEL_ONNX,
+    SEGMENTATION_MODEL_PT,
 )
 
 
@@ -112,6 +115,16 @@ def load_yolo_model() -> tuple[YOLO, str]:
         device,
     )
     return model, device
+
+
+def load_segmentation_model(device: str) -> YOLO:
+    """Load the YOLO segmentation model, preferring TensorRT, then ONNX, then PyTorch."""
+    patch_ultralytics_pose26()
+    return load_backend_model(
+        "YOLO segmentation",
+        [("TensorRT", SEGMENTATION_MODEL_ENGINE), ("ONNX", SEGMENTATION_MODEL_ONNX), ("PyTorch", SEGMENTATION_MODEL_PT)],
+        device,
+    )
 
 
 def load_pose_model(device: str) -> YOLO:

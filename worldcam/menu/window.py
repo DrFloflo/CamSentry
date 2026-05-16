@@ -9,6 +9,8 @@ from worldcam.menu.constants import (
     MENU_EVENT_CLOSED,
     MENU_EVENT_POSE,
     MENU_EVENT_SAHI,
+    MENU_EVENT_TRACKING,
+    MENU_EVENT_SEGMENTATION,
     MENU_EVENT_THRESHOLD,
     MENU_WINDOW_GEOMETRY,
     MENU_WINDOW_TITLE,
@@ -20,6 +22,8 @@ def run_class_menu_process(
     selected_class_names: set[str],
     pose_enabled: bool,
     sahi_enabled: bool,
+    tracking_enabled: bool,
+    segmentation_enabled: bool,
     display_threshold: float,
     event_queue: mp.Queue,
     command_queue: mp.Queue,
@@ -50,6 +54,8 @@ def run_class_menu_process(
 
     pose_var = tk.BooleanVar(value=pose_enabled)
     sahi_var = tk.BooleanVar(value=sahi_enabled)
+    tracking_var = tk.BooleanVar(value=tracking_enabled)
+    segmentation_var = tk.BooleanVar(value=segmentation_enabled)
     threshold_var = tk.DoubleVar(value=display_threshold)
     threshold_label_var = tk.StringVar(value=f"Threshold: {display_threshold:.2f}")
 
@@ -59,6 +65,12 @@ def run_class_menu_process(
     def toggle_sahi() -> None:
         event_queue.put((MENU_EVENT_SAHI, bool(sahi_var.get())))
 
+    def toggle_tracking() -> None:
+        event_queue.put((MENU_EVENT_TRACKING, bool(tracking_var.get())))
+
+    def toggle_segmentation() -> None:
+        event_queue.put((MENU_EVENT_SEGMENTATION, bool(segmentation_var.get())))
+
     def update_threshold(value: str) -> None:
         threshold = round(float(value), 2)
         threshold_label_var.set(f"Threshold: {threshold:.2f}")
@@ -66,6 +78,8 @@ def run_class_menu_process(
 
     ttk.Checkbutton(top_frame, text="Pose", variable=pose_var, command=toggle_pose, style="WorldCam.TCheckbutton").pack(side="left")
     ttk.Checkbutton(top_frame, text="SAHI", variable=sahi_var, command=toggle_sahi, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
+    ttk.Checkbutton(top_frame, text="Tracking", variable=tracking_var, command=toggle_tracking, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
+    ttk.Checkbutton(top_frame, text="Seg", variable=segmentation_var, command=toggle_segmentation, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
 
     threshold_frame = ttk.Frame(root)
     threshold_frame.pack(fill="x", padx=10, pady=(0, 8))
@@ -174,6 +188,14 @@ def run_class_menu_process(
             return "break"
         if key in {"next", "page_down"}:
             scroll_units(8)
+            return "break"
+        if key == "t":
+            tracking_var.set(not tracking_var.get())
+            toggle_tracking()
+            return "break"
+        if key == "g":
+            segmentation_var.set(not segmentation_var.get())
+            toggle_segmentation()
             return "break"
         if key == "space":
             if 0 <= current_index < len(class_vars):

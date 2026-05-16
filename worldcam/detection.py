@@ -177,13 +177,13 @@ def draw_yolo_detections(frame: np.ndarray, detections: list[Detection], display
         if confidence < display_threshold:
             continue
         color = get_detection_color(label)
-        cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), color, 2)
+        cv2.rectangle(frame, (final_x1, final_y1), (final_x2, final_y2), color, 1)
         cv2.putText(
             frame,
             label,
             (final_x1, max(final_y1 - 10, 20)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
+            0.5,
             color,
-            2,
+            1,
         )
