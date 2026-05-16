@@ -5,6 +5,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from worldcam.face_yunet import detect_faces_yunet
 from worldcam.image_upscale import upscale_for_display
 
 FACE_ZOOM_WINDOW_NAME = "Zoom visage selectionne"
@@ -32,8 +33,8 @@ def load_face_cascade() -> cv2.CascadeClassifier | None:
     return _FACE_CASCADE
 
 
-def detect_faces(photo: np.ndarray) -> list[tuple[int, int, int, int]]:
-    """Detect faces in a selected person photo using OpenCV only."""
+def detect_faces_haar(photo: np.ndarray) -> list[tuple[int, int, int, int]]:
+    """Fallback face detection using OpenCV Haar cascade."""
     cascade = load_face_cascade()
     if cascade is None:
         return []
@@ -48,6 +49,14 @@ def detect_faces(photo: np.ndarray) -> list[tuple[int, int, int, int]]:
         flags=cv2.CASCADE_SCALE_IMAGE,
     )
     return [(int(x), int(y), int(w), int(h)) for x, y, w, h in faces]
+
+
+def detect_faces(photo: np.ndarray) -> list[tuple[int, int, int, int]]:
+    """Detect faces with specialized YuNet first, then Haar as fallback."""
+    faces = detect_faces_yunet(photo)
+    if faces:
+        return faces
+    return detect_faces_haar(photo)
 
 
 def choose_best_face(faces: list[tuple[int, int, int, int]]) -> tuple[int, int, int, int] | None:
