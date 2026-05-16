@@ -13,7 +13,7 @@ from worldcam.config import (
     FRAME_SKIP,
     READ_WARN_SECONDS,
     STATS_LOG_SECONDS,
-    STREAM_URL,
+    STREAM_URLS,
     TARGET_FPS,
 )
 from worldcam.detection import Detection, draw_yolo_detections, run_sahi_analysis, run_yolo_analysis
@@ -28,7 +28,10 @@ from worldcam.streaming import (
     start_ffmpeg_pipe,
 )
 from worldcam.tracking import PersonTrack, PersonTracker, draw_person_tracks
-from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, draw_fps, handle_class_menu_key, snapshot_menu_state
+from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, draw_fps, draw_stream_counter, handle_class_menu_key, snapshot_menu_state
+
+KEY_LEFT_VALUES = {81, 2424832}
+KEY_RIGHT_VALUES = {83, 2555904}
 
 
 def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
@@ -38,8 +41,9 @@ def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
     return class_names, selected_class_names
 
 
-def open_stream(url: str) -> tuple[cv2.VideoCapture | None, subprocess.Popen | None]:
+def open_stream(url: str, stream_index: int, stream_total: int) -> tuple[cv2.VideoCapture | None, subprocess.Popen | None]:
     """Open the stream through OpenCV, falling back to an external ffmpeg pipe."""
+    print(f"Ouverture du stream {stream_index + 1}/{stream_total}...")
     cap = open_with_opencv(url)
     ffmpeg_process = None
 
@@ -50,6 +54,18 @@ def open_stream(url: str) -> tuple[cv2.VideoCapture | None, subprocess.Popen | N
         print("Analyse en cours... Appuyez sur 'q' pour quitter.")
 
     return cap, ffmpeg_process
+
+
+def release_stream_resources(
+    cap: cv2.VideoCapture | None,
+    ffmpeg_process: subprocess.Popen | None,
+) -> None:
+    """Release only the active stream resources."""
+    if cap is not None:
+        cap.release()
+    if ffmpeg_process is not None:
+        ffmpeg_process.terminate()
+        ffmpeg_process.wait(timeout=5)
 
 
 def read_stream_frame(
@@ -130,6 +146,8 @@ def draw_overlay(
     segmentations: list[SegmentationMask],
     display_threshold: float,
     person_tracks: list[PersonTrack],
+    stream_index: int,
+    stream_total: int,
 ) -> None:
     """Draw every visual overlay on the current frame."""
     draw_segmentation_masks(frame, segmentations, display_threshold)
@@ -137,6 +155,7 @@ def draw_overlay(
     draw_person_tracks(frame, person_tracks, display_threshold)
     draw_pose_detections(frame, poses)
     draw_fps(frame, fps)
+    draw_stream_counter(frame, stream_index, stream_total)
 
 
 def throttle_display(next_frame_at: float) -> float:
@@ -158,11 +177,7 @@ def cleanup_resources(
     device: str,
 ) -> None:
     """Release stream, model, and OpenCV resources."""
-    if cap is not None:
-        cap.release()
-    if ffmpeg_process is not None:
-        ffmpeg_process.terminate()
-        ffmpeg_process.wait(timeout=5)
+    release_stream_resources(cap, ffmpeg_process)
     if device == "cuda":
         del model
         if pose_model is not None:
@@ -176,14 +191,20 @@ def cleanup_resources(
 def main() -> None:
     """Run the WorldCam analysis application."""
     configure_ffmpeg_http_headers()
-    print_videoio_diagnostics(STREAM_URL)
+    if not STREAM_URLS:
+        print("Erreur : aucun stream configuré dans STREAM_URLS.")
+        return
+
+    stream_total = len(STREAM_URLS)
+    stream_index = 0
+    print_videoio_diagnostics(STREAM_URLS[stream_index])
 
     model, device = load_yolo_model()
     pose_model = None
     segmentation_model = None
 
     try:
-        cap, ffmpeg_process = open_stream(STREAM_URL)
+        cap, ffmpeg_process = open_stream(STREAM_URLS[stream_index], stream_index, stream_total)
     except RuntimeError as exc:
         print(f"Erreur : {exc}")
         return
@@ -264,13 +285,39 @@ def main() -> None:
                 latest_segmentations,
                 display_threshold,
                 latest_person_tracks,
+                stream_index,
+                stream_total,
             )
             next_frame_at = throttle_display(next_frame_at)
             cv2.imshow("Analyse Image - Dublin Cam", frame)
 
-            key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKeyEx(1)
             if key == ord("q"):
                 break
+            if key in KEY_LEFT_VALUES or key in KEY_RIGHT_VALUES:
+                step = -1 if key in KEY_LEFT_VALUES else 1
+                next_stream_index = (stream_index + step) % stream_total
+                release_stream_resources(cap, ffmpeg_process)
+                try:
+                    cap, ffmpeg_process = open_stream(STREAM_URLS[next_stream_index], next_stream_index, stream_total)
+                    stream_index = next_stream_index
+                    print_videoio_diagnostics(STREAM_URLS[stream_index])
+                except RuntimeError as exc:
+                    print(f"Erreur pendant le changement de stream : {exc}")
+                    cap, ffmpeg_process = open_stream(STREAM_URLS[stream_index], stream_index, stream_total)
+                latest_detections = []
+                latest_poses = []
+                latest_segmentations = []
+                latest_person_tracks = []
+                person_tracker.reset()
+                frame_count = 0
+                slow_reads = 0
+                started_at = time.perf_counter()
+                last_stats_at = started_at
+                next_frame_at = started_at
+                last_frame_at = started_at
+                current_fps = 0.0
+                continue
             keyboard_class_changed, keyboard_pose_toggled, keyboard_sahi_toggled, keyboard_tracking_toggled, keyboard_segmentation_toggled, keyboard_threshold_changed = handle_class_menu_key(
                 key,
                 class_names,
