@@ -27,7 +27,7 @@ from worldcam.streaming import (
     read_ffmpeg_frame,
     start_ffmpeg_pipe,
 )
-from worldcam.ui import MenuState, draw_class_menu, draw_fps, handle_class_menu_key
+from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, draw_fps, handle_class_menu_key, snapshot_menu_state
 
 
 def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
@@ -109,16 +109,12 @@ def draw_overlay(
     fps: float,
     detections: list[Detection],
     poses: list[Pose],
-    class_names: list[str],
-    selected_class_names: set[str],
     menu_state: MenuState,
 ) -> None:
     """Draw every visual overlay on the current frame."""
     draw_yolo_detections(frame, detections)
     draw_pose_detections(frame, poses)
     draw_fps(frame, fps)
-    if menu_state.is_open:
-        draw_class_menu(frame, class_names, selected_class_names, menu_state)
 
 
 def throttle_display(next_frame_at: float) -> float:
@@ -210,18 +206,19 @@ def main() -> None:
                 )
                 last_stats_at = now
 
+            selected_snapshot, pose_enabled, sahi_enabled = snapshot_menu_state(menu_state, selected_class_names)
             if frame_count % FRAME_SKIP == 0:
                 latest_detections, latest_poses, pose_model = run_model_analysis(
                     frame,
                     model,
                     pose_model,
                     device,
-                    selected_class_names,
+                    selected_snapshot,
                     latest_detections,
                     latest_poses,
-                    menu_state.pose_enabled,
+                    pose_enabled,
                     sahi_model,
-                    menu_state.sahi_enabled,
+                    sahi_enabled,
                 )
 
             draw_overlay(
@@ -229,18 +226,24 @@ def main() -> None:
                 current_fps,
                 latest_detections,
                 latest_poses,
-                class_names,
-                selected_class_names,
                 menu_state,
             )
-
             next_frame_at = throttle_display(next_frame_at)
             cv2.imshow("Analyse Image - Dublin Cam", frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
-            class_selection_changed, pose_toggled, sahi_toggled = handle_class_menu_key(key, class_names, selected_class_names, menu_state)
+            keyboard_class_changed, keyboard_pose_toggled, keyboard_sahi_toggled = handle_class_menu_key(
+                key,
+                class_names,
+                selected_class_names,
+                menu_state,
+            )
+            mouse_class_changed, mouse_pose_toggled, mouse_sahi_toggled = consume_menu_changes(menu_state, selected_class_names)
+            class_selection_changed = keyboard_class_changed or mouse_class_changed
+            pose_toggled = keyboard_pose_toggled or mouse_pose_toggled
+            sahi_toggled = keyboard_sahi_toggled or mouse_sahi_toggled
             if sahi_toggled and menu_state.sahi_enabled and sahi_model is None:
                 try:
                     sahi_model = load_sahi_model(device)
@@ -252,4 +255,5 @@ def main() -> None:
             if pose_toggled and not menu_state.pose_enabled:
                 latest_poses = []
     finally:
+        close_class_menu_window(menu_state)
         cleanup_resources(cap, ffmpeg_process, model, pose_model, device)
