@@ -7,6 +7,8 @@ import numpy as np
 from ultralytics import YOLO
 
 from worldcam.detection import Detection
+from worldcam.face_scanner import close_face_zoom_window, scan_and_open_face_zoom
+from worldcam.image_upscale import upscale_for_display
 from worldcam.models import load_segmentation_model
 from worldcam.segmentation import SegmentationMask, run_segmentation_analysis
 
@@ -152,22 +154,24 @@ def build_person_cutout(frame: np.ndarray, detection: Detection, segmentation: S
 
 def open_person_photo_window(photo: np.ndarray) -> None:
     """Open or refresh a dedicated resizable OpenCV window with the selected person photo."""
-    photo_height, photo_width = photo.shape[:2]
+    photo = upscale_for_display(photo, PERSON_PHOTO_MIN_WINDOW_WIDTH, PERSON_PHOTO_MIN_WINDOW_HEIGHT, max_scale=3.0)
+    scanned_photo = scan_and_open_face_zoom(photo)
+    photo_height, photo_width = scanned_photo.shape[:2]
     window_width = max(PERSON_PHOTO_MIN_WINDOW_WIDTH, photo_width)
     window_height = max(PERSON_PHOTO_MIN_WINDOW_HEIGHT, photo_height)
     cv2.namedWindow(PERSON_PHOTO_WINDOW_NAME, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(PERSON_PHOTO_WINDOW_NAME, window_width, window_height)
     cv2.moveWindow(PERSON_PHOTO_WINDOW_NAME, 80, 80)
-    cv2.imshow(PERSON_PHOTO_WINDOW_NAME, photo)
+    cv2.imshow(PERSON_PHOTO_WINDOW_NAME, scanned_photo)
     cv2.waitKey(1)
 
 
-def crop_detection_with_padding(frame: np.ndarray, detection: Detection, padding_ratio: float = 0.08) -> tuple[np.ndarray, tuple[int, int, int, int]] | None:
+def crop_detection_with_padding(frame: np.ndarray, detection: Detection, padding_ratio: float = 0.18) -> tuple[np.ndarray, tuple[int, int, int, int]] | None:
     """Crop the clicked detection with a small margin and return crop plus source bbox."""
     frame_height, frame_width = frame.shape[:2]
     x1, y1, x2, y2 = detection[:4]
-    padding_x = int(max(8, (x2 - x1) * padding_ratio))
-    padding_y = int(max(8, (y2 - y1) * padding_ratio))
+    padding_x = int(max(24, (x2 - x1) * padding_ratio))
+    padding_y = int(max(24, (y2 - y1) * padding_ratio))
     crop_x1 = max(0, x1 - padding_x)
     crop_y1 = max(0, y1 - padding_y)
     crop_x2 = min(frame_width, x2 + padding_x)
@@ -262,7 +266,8 @@ def handle_main_window_mouse(event: int, x: int, y: int, _flags: int, userdata: 
 
 
 def close_person_photo_window() -> None:
-    """Close the segmented person photo window if it exists."""
+    """Close the segmented person photo and face zoom windows if they exist."""
+    close_face_zoom_window()
     try:
         cv2.destroyWindow(PERSON_PHOTO_WINDOW_NAME)
     except cv2.error:
