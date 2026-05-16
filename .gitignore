@@ -4,3 +4,4 @@ __pycache__/
 .vscode
 yolo11*
 yolo26l.pt
+yolo26m-pose.pt
