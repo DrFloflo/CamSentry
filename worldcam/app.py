@@ -22,10 +22,10 @@ from worldcam.pose import Pose, draw_pose_detections, run_pose_analysis
 from worldcam.person_photo import close_person_photo_window, handle_main_window_mouse, show_clicked_person_photo
 from worldcam.segmentation import SegmentationMask, draw_segmentation_masks, run_segmentation_analysis
 from worldcam.streaming import (
+    BufferedStreamReader,
     configure_ffmpeg_http_headers,
     open_with_opencv,
     print_videoio_diagnostics,
-    read_ffmpeg_frame,
     start_ffmpeg_pipe,
 )
 from worldcam.tracking import PersonTrack, PersonTracker, draw_person_tracks, draw_vehicle_counts
@@ -34,6 +34,8 @@ from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes
 KEY_LEFT_VALUES = {81, 2424832}
 KEY_RIGHT_VALUES = {83, 2555904}
 MAIN_WINDOW_NAME = "Analyse Image - Earth cam"
+STREAM_READ_TIMEOUT = 1.0
+MAX_STREAM_READ_FAILURES = 5
 
 
 def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
@@ -70,18 +72,14 @@ def release_stream_resources(
         ffmpeg_process.wait(timeout=5)
 
 
-def read_stream_frame(
+def start_buffered_stream_reader(
     cap: cv2.VideoCapture | None,
     ffmpeg_process: subprocess.Popen | None,
-) -> tuple[bool, object]:
-    """Read one frame from the active stream backend."""
-    if cap is not None:
-        return cap.read()
-
-    if ffmpeg_process is None:
-        return False, None
-
-    return read_ffmpeg_frame(ffmpeg_process)
+) -> BufferedStreamReader:
+    """Start a latest-frame RAM buffer for the active stream backend."""
+    stream_reader = BufferedStreamReader(cap, ffmpeg_process)
+    stream_reader.start()
+    return stream_reader
 
 
 def run_model_analysis(
@@ -212,9 +210,11 @@ def main() -> None:
     except RuntimeError as exc:
         print(f"Erreur : {exc}")
         return
+    stream_reader = start_buffered_stream_reader(cap, ffmpeg_process)
 
     frame_count = 0
     slow_reads = 0
+    stream_read_failures = 0
     started_at = time.perf_counter()
     last_stats_at = started_at
     next_frame_at = time.perf_counter()
@@ -235,7 +235,7 @@ def main() -> None:
     try:
         while True:
             read_started_at = time.perf_counter()
-            ret, frame = read_stream_frame(cap, ffmpeg_process)
+            ret, frame = stream_reader.read(timeout=STREAM_READ_TIMEOUT)
             read_duration = time.perf_counter() - read_started_at
 
             if read_duration > READ_WARN_SECONDS:
@@ -243,8 +243,32 @@ def main() -> None:
                 print(f"Lecture lente: {read_duration:.3f}s pour récupérer une frame.")
 
             if not ret:
-                print("Erreur : Impossible de recevoir la frame.")
-                break
+                stream_read_failures += 1
+                print(f"Lecture flux indisponible ({stream_read_failures}/{MAX_STREAM_READ_FAILURES}).")
+                if stream_read_failures < MAX_STREAM_READ_FAILURES:
+                    continue
+
+                print("Reconnexion automatique du flux...")
+                stream_reader.request_stop()
+                release_stream_resources(cap, ffmpeg_process)
+                try:
+                    cap, ffmpeg_process = open_stream(STREAM_URLS[stream_index], stream_index, stream_total)
+                    stream_reader = start_buffered_stream_reader(cap, ffmpeg_process)
+                    print_videoio_diagnostics(STREAM_URLS[stream_index])
+                    stream_read_failures = 0
+                    latest_detections = []
+                    latest_poses = []
+                    latest_segmentations = []
+                    latest_person_tracks = []
+                    click_state["click_position"] = None
+                    close_person_photo_window()
+                    person_tracker.reset()
+                    continue
+                except RuntimeError as exc:
+                    print(f"Erreur pendant la reconnexion automatique : {exc}")
+                    break
+
+            stream_read_failures = 0
 
             frame_count += 1
             now = time.perf_counter()
@@ -318,14 +342,17 @@ def main() -> None:
             if key in KEY_LEFT_VALUES or key in KEY_RIGHT_VALUES:
                 step = -1 if key in KEY_LEFT_VALUES else 1
                 next_stream_index = (stream_index + step) % stream_total
+                stream_reader.request_stop()
                 release_stream_resources(cap, ffmpeg_process)
                 try:
                     cap, ffmpeg_process = open_stream(STREAM_URLS[next_stream_index], next_stream_index, stream_total)
+                    stream_reader = start_buffered_stream_reader(cap, ffmpeg_process)
                     stream_index = next_stream_index
                     print_videoio_diagnostics(STREAM_URLS[stream_index])
                 except RuntimeError as exc:
                     print(f"Erreur pendant le changement de stream : {exc}")
                     cap, ffmpeg_process = open_stream(STREAM_URLS[stream_index], stream_index, stream_total)
+                    stream_reader = start_buffered_stream_reader(cap, ffmpeg_process)
                 latest_detections = []
                 latest_poses = []
                 latest_segmentations = []
@@ -335,6 +362,7 @@ def main() -> None:
                 person_tracker.reset()
                 frame_count = 0
                 slow_reads = 0
+                stream_read_failures = 0
                 started_at = time.perf_counter()
                 last_stats_at = started_at
                 next_frame_at = started_at
@@ -367,4 +395,5 @@ def main() -> None:
                 latest_poses = []
     finally:
         close_class_menu_window(menu_state)
+        stream_reader.stop()
         cleanup_resources(cap, ffmpeg_process, model, pose_model, segmentation_model, device)

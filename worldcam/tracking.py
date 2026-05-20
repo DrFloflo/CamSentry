@@ -17,6 +17,20 @@ from worldcam.config import (
 from worldcam.detection import Detection, get_detection_color
 
 VEHICLE_COUNT_CLASSES = {"car", "truck"}
+VEHICLE_COUNT_MIN_HITS = 3
+VEHICLE_COUNT_MEMORY_AGE = 30
+VEHICLE_COUNT_MAX_DISTANCE = 140.0
+VEHICLE_COUNT_MIN_IOU = 0.10
+
+
+@dataclass
+class CountedVehicle:
+    """Short-lived memory for a vehicle that was already counted."""
+
+    class_name: str
+    bbox: tuple[int, int, int, int]
+    track_id: int | None = None
+    age: int = 0
 
 
 @dataclass
@@ -29,6 +43,7 @@ class PersonTrack:
     class_name: str
     age: int = 0
     hits: int = 1
+    counted: bool = False
     trail: list[tuple[int, int]] = field(default_factory=list)
 
     @property
@@ -81,6 +96,7 @@ class PersonTracker:
         self.tracks: dict[int, PersonTrack] = {}
         self.next_track_id = 1
         self.vehicle_counts = {class_name: 0 for class_name in sorted(VEHICLE_COUNT_CLASSES)}
+        self.counted_vehicle_memory: list[CountedVehicle] = []
 
     def reset(self) -> None:
         """Clear all active tracks and restart ID allocation."""
@@ -88,9 +104,58 @@ class PersonTracker:
             print(f"Tracking objects: reset active_ids={sorted(self.tracks)}")
         self.tracks.clear()
         self.next_track_id = 1
+        self.counted_vehicle_memory.clear()
+
+    def is_recently_counted_vehicle(self, class_name: str, bbox: tuple[int, int, int, int]) -> bool:
+        """Return whether a matching vehicle was already counted recently."""
+        for counted_vehicle in self.counted_vehicle_memory:
+            if counted_vehicle.class_name != class_name:
+                continue
+            if calculate_iou(counted_vehicle.bbox, bbox) >= VEHICLE_COUNT_MIN_IOU:
+                return True
+            if calculate_center_distance(counted_vehicle.bbox, bbox) <= VEHICLE_COUNT_MAX_DISTANCE:
+                return True
+        return False
+
+    def remember_counted_vehicle(self, track: PersonTrack) -> None:
+        """Store a counted vehicle for a few updates to prevent duplicate counts."""
+        self.counted_vehicle_memory.append(CountedVehicle(class_name=track.class_name, bbox=track.bbox, track_id=track.track_id))
+
+    def refresh_counted_vehicle_memory(self) -> None:
+        """Keep counted vehicle memory aligned with active confirmed tracks."""
+        for track in self.tracks.values():
+            if not track.counted or track.class_name not in self.vehicle_counts:
+                continue
+            for counted_vehicle in self.counted_vehicle_memory:
+                if counted_vehicle.track_id == track.track_id:
+                    counted_vehicle.bbox = track.bbox
+                    counted_vehicle.age = 0
+                    break
+
+    def age_counted_vehicle_memory(self) -> None:
+        """Age and prune recently counted vehicle memory."""
+        kept_memory = []
+        for counted_vehicle in self.counted_vehicle_memory:
+            counted_vehicle.age += 1
+            if counted_vehicle.age <= VEHICLE_COUNT_MEMORY_AGE:
+                kept_memory.append(counted_vehicle)
+        self.counted_vehicle_memory = kept_memory
+
+    def update_vehicle_counts(self) -> None:
+        """Count confirmed vehicle tracks once, with duplicate suppression."""
+        for track in self.tracks.values():
+            if track.counted or track.class_name not in self.vehicle_counts or track.hits < VEHICLE_COUNT_MIN_HITS:
+                continue
+            if self.is_recently_counted_vehicle(track.class_name, track.bbox):
+                track.counted = True
+                continue
+            self.vehicle_counts[track.class_name] += 1
+            track.counted = True
+            self.remember_counted_vehicle(track)
 
     def update(self, detections: list[Detection]) -> list[PersonTrack]:
         """Update tracks from the latest selected detections and return active tracks."""
+        self.age_counted_vehicle_memory()
         object_boxes = [
             (x1, y1, x2, y2, confidence, get_detection_class_name(detection))
             for detection in detections
@@ -139,8 +204,6 @@ class PersonTracker:
             track = PersonTrack(track_id=track_id, bbox=(x1, y1, x2, y2), confidence=confidence, class_name=class_name)
             track.trail.append(track.center)
             self.tracks[track_id] = track
-            if class_name in self.vehicle_counts:
-                self.vehicle_counts[class_name] += 1
 
         removed_track_ids = []
         for track_id in list(unmatched_track_ids):
@@ -149,6 +212,9 @@ class PersonTracker:
             if track.age > PERSON_TRACK_MAX_AGE:
                 removed_track_ids.append(track_id)
                 del self.tracks[track_id]
+
+        self.update_vehicle_counts()
+        self.refresh_counted_vehicle_memory()
 
         if PERSON_TRACK_DEBUG:
             print(
