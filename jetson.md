@@ -1,0 +1,1 @@
+Version L4T R32.7.6, jetpack 4.6.6

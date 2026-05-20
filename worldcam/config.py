@@ -2,6 +2,10 @@
 
 STREAM_URLS = [
     (
+        "https://videos-3.earthcam.com/fecnetwork/22172.flv/playlist.m3u8?"
+        "t=pOGmzuDAmYSX7knfXlDLzYSXAgLsxTkQOagDzUD/U1NsjqCkLWUOMbS9PlyNFjKC&td=202605201348"
+    ),
+    (
         "https://videos-3.earthcam.com/fecnetwork/24322.flv/playlist.m3u8?"
         "t=qAP3aum0UbcBtTuO%2Fx%2F7Lz9UytxcCWnrPDJyjgaIxep8QE4xtRu4RMqXEWHwdbnk&td=202605160341"
     ),
@@ -37,7 +41,7 @@ FACE_DETECTION_MODEL_ONNX = "models/face_detection_yunet_2023mar.onnx"
 FACE_DETECTION_MODEL_ENGINE = "models/face_detection_yunet_2023mar.engine"
 DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck"}
 INFERENCE_WIDTH = 640
-FRAME_SKIP = 6
+FRAME_SKIP = 2
 
 SAHI_ENABLED = True
 SAHI_MODEL_PATH = MODEL_PT
