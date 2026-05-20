@@ -28,12 +28,12 @@ from worldcam.streaming import (
     read_ffmpeg_frame,
     start_ffmpeg_pipe,
 )
-from worldcam.tracking import PersonTrack, PersonTracker, draw_person_tracks
+from worldcam.tracking import PersonTrack, PersonTracker, draw_person_tracks, draw_vehicle_counts
 from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, draw_fps, draw_stream_counter, handle_class_menu_key, snapshot_menu_state
 
 KEY_LEFT_VALUES = {81, 2424832}
 KEY_RIGHT_VALUES = {83, 2555904}
-MAIN_WINDOW_NAME = "Analyse Image - Dublin Cam"
+MAIN_WINDOW_NAME = "Analyse Image - Earth cam"
 
 
 def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
@@ -150,6 +150,7 @@ def draw_overlay(
     person_tracks: list[PersonTrack],
     stream_index: int,
     stream_total: int,
+    vehicle_counts: dict[str, int],
 ) -> None:
     """Draw every visual overlay on the current frame."""
     draw_segmentation_masks(frame, segmentations, display_threshold)
@@ -158,6 +159,7 @@ def draw_overlay(
     draw_pose_detections(frame, poses)
     draw_fps(frame, fps)
     draw_stream_counter(frame, stream_index, stream_total)
+    draw_vehicle_counts(frame, vehicle_counts)
 
 
 def throttle_display(next_frame_at: float) -> float:
@@ -305,6 +307,7 @@ def main() -> None:
                 latest_person_tracks,
                 stream_index,
                 stream_total,
+                person_tracker.vehicle_counts,
             )
             next_frame_at = throttle_display(next_frame_at)
             cv2.imshow(MAIN_WINDOW_NAME, frame)
