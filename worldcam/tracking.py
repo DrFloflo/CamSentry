@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 
 from worldcam.config import (
-    PERSON_TRACK_COLOR,
     PERSON_TRACK_DEBUG,
     PERSON_TRACK_MAX_AGE,
     PERSON_TRACK_MAX_DISTANCE,

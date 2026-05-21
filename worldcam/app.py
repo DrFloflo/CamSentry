@@ -19,7 +19,6 @@ from worldcam.config import (
 from worldcam.detection import Detection, draw_yolo_detections, run_sahi_analysis, run_yolo_analysis
 from worldcam.models import load_pose_model, load_segmentation_model, load_yolo_model
 from worldcam.pose import Pose, draw_pose_detections, run_pose_analysis
-from worldcam.person_photo import close_person_photo_window, handle_main_window_mouse, show_clicked_person_photo
 from worldcam.segmentation import SegmentationMask, draw_segmentation_masks, run_segmentation_analysis
 from worldcam.streaming import (
     BufferedStreamReader,
@@ -230,7 +229,6 @@ def main() -> None:
     menu_state = MenuState()
     click_state: dict[str, tuple[int, int] | None] = {"click_position": None}
     cv2.namedWindow(MAIN_WINDOW_NAME)
-    cv2.setMouseCallback(MAIN_WINDOW_NAME, handle_main_window_mouse, click_state)
 
     try:
         while True:
@@ -261,7 +259,6 @@ def main() -> None:
                     latest_segmentations = []
                     latest_person_tracks = []
                     click_state["click_position"] = None
-                    close_person_photo_window()
                     person_tracker.reset()
                     continue
                 except RuntimeError as exc:
@@ -308,19 +305,6 @@ def main() -> None:
                     latest_person_tracks = []
                     person_tracker.reset()
 
-            click_position = click_state["click_position"]
-            if click_position is not None:
-                click_state["click_position"] = None
-                segmentation_model, latest_segmentations = show_clicked_person_photo(
-                    frame,
-                    click_position,
-                    latest_detections,
-                    latest_segmentations,
-                    segmentation_model,
-                    device,
-                    display_threshold,
-                )
-
             draw_overlay(
                 frame,
                 current_fps,
@@ -358,7 +342,6 @@ def main() -> None:
                 latest_segmentations = []
                 latest_person_tracks = []
                 click_state["click_position"] = None
-                close_person_photo_window()
                 person_tracker.reset()
                 frame_count = 0
                 slow_reads = 0
@@ -387,7 +370,6 @@ def main() -> None:
                 latest_segmentations = []
                 latest_person_tracks = []
                 click_state["click_position"] = None
-                close_person_photo_window()
                 person_tracker.reset()
             if threshold_changed:
                 display_threshold = menu_state.display_threshold
