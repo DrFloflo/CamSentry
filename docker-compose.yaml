@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  jetson-inference:
+    image: dustynv/jetson-inference:r32.7.1
+    container_name: jetson-inference
+
+    runtime: nvidia
+    network_mode: host
+
+    stdin_open: true
+    tty: true
+
+    volumes:
+      - /home/xedge/Documents/jetson-inference:/jetson-inference
+
+    restart: unless-stopped
