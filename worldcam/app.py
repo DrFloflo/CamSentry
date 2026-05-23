@@ -227,7 +227,6 @@ def main() -> None:
     person_tracker = PersonTracker()
     class_names, selected_class_names = build_class_selection(model)
     menu_state = MenuState()
-    click_state: dict[str, tuple[int, int] | None] = {"click_position": None}
     cv2.namedWindow(MAIN_WINDOW_NAME)
 
     try:
@@ -258,7 +257,6 @@ def main() -> None:
                     latest_poses = []
                     latest_segmentations = []
                     latest_person_tracks = []
-                    click_state["click_position"] = None
                     person_tracker.reset()
                     continue
                 except RuntimeError as exc:
@@ -341,7 +339,6 @@ def main() -> None:
                 latest_poses = []
                 latest_segmentations = []
                 latest_person_tracks = []
-                click_state["click_position"] = None
                 person_tracker.reset()
                 frame_count = 0
                 slow_reads = 0
@@ -369,7 +366,6 @@ def main() -> None:
                 latest_detections = []
                 latest_segmentations = []
                 latest_person_tracks = []
-                click_state["click_position"] = None
                 person_tracker.reset()
             if threshold_changed:
                 display_threshold = menu_state.display_threshold
