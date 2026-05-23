@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 
 from worldcam.menu import (
+    MenuChanges,
+    MenuSnapshot,
     MenuState,
     close_class_menu_window,
     consume_menu_changes,
@@ -42,6 +44,8 @@ def draw_stream_counter(frame: np.ndarray, stream_index: int, stream_total: int)
 
 
 __all__ = [
+    "MenuChanges",
+    "MenuSnapshot",
     "MenuState",
     "close_class_menu_window",
     "consume_menu_changes",

@@ -227,7 +227,10 @@ def run_class_menu_process(
     root.bind_all("<Key>", handle_key)
     root.protocol("WM_DELETE_WINDOW", close_window)
 
-    root.after(100, root.focus_force)
+    root.lift()
+    root.focus_force()
+    root.after(50, root.lift)
+    root.after(50, root.focus_force)
     root.after(50, poll_commands)
     try:
         root.mainloop()

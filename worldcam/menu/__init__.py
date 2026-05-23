@@ -18,7 +18,7 @@ from worldcam.menu.controller import (
     snapshot_menu_state,
     start_class_menu_window,
 )
-from worldcam.menu.state import MenuState
+from worldcam.menu.state import MenuChanges, MenuSnapshot, MenuState
 from worldcam.menu.window import run_class_menu_process
 
 __all__ = [
@@ -31,6 +31,8 @@ __all__ = [
     "MENU_WINDOW_GEOMETRY",
     "MENU_WINDOW_TITLE",
     "MenuEvent",
+    "MenuChanges",
+    "MenuSnapshot",
     "MenuState",
     "close_class_menu_window",
     "consume_menu_changes",

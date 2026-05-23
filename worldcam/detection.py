@@ -9,14 +9,13 @@ from ultralytics import YOLO
 from worldcam.config import (
     DETECTION_CLASS_COLORS,
     DETECTION_FALLBACK_COLORS,
-    INFERENCE_WIDTH,
     SAHI_CONFIDENCE_THRESHOLD,
     SAHI_OVERLAP_HEIGHT_RATIO,
     SAHI_OVERLAP_WIDTH_RATIO,
     SAHI_SLICE_HEIGHT,
     SAHI_SLICE_WIDTH,
 )
-from worldcam.models import run_model_inference
+from worldcam.models import run_model_inference, run_resized_model_inference
 
 Detection = tuple[int, int, int, int, str, float]
 
@@ -55,15 +54,14 @@ def run_yolo_analysis(
     selected_class_names: set[str],
 ) -> list[Detection]:
     """Resize the frame, run YOLO26L inference, and return detections for the original frame."""
-    frame_h, frame_w, _ = frame.shape
-    new_width = min(INFERENCE_WIDTH, frame_w)
-    new_height = int(frame_h * (new_width / frame_w))
-    resized_frame = cv2.resize(frame, (new_width, new_height))
-
-    results = run_model_inference(model, resized_frame, device)
-    scale_x = frame_w / new_width
-    scale_y = frame_h / new_height
-    return extract_yolo_detections(results, model, scale_x, scale_y, selected_class_names)
+    inference = run_resized_model_inference(model, frame, device)
+    return extract_yolo_detections(
+        inference.results,
+        model,
+        inference.scale_x,
+        inference.scale_y,
+        selected_class_names,
+    )
 
 
 def get_slice_starts(image_size: int, slice_size: int, overlap_ratio: float) -> list[int]:
@@ -156,6 +154,8 @@ def run_sahi_analysis(
     object_predictions = extract_sliced_yolo_predictions(frame, model, device, selected_class_names)
     if not object_predictions:
         return []
+    if len(object_predictions) == 1:
+        return convert_sahi_predictions_to_detections(object_predictions, frame_w, frame_h)
 
     nms_postprocess = NMSPostprocess(match_threshold=0.5, match_metric="IOU", class_agnostic=False)
     combined_predictions = nms_postprocess(object_predictions)

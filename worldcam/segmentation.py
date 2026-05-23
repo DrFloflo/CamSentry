@@ -4,9 +4,9 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from worldcam.config import INFERENCE_WIDTH, SEGMENTATION_ALPHA, SEGMENTATION_CONTOUR_THICKNESS, SEGMENTATION_Y_OFFSET
+from worldcam.config import SEGMENTATION_ALPHA, SEGMENTATION_CONTOUR_THICKNESS, SEGMENTATION_Y_OFFSET
 from worldcam.detection import get_detection_color
-from worldcam.models import run_model_inference
+from worldcam.models import run_resized_model_inference
 
 SegmentationMask = tuple[np.ndarray, str, float]
 
@@ -56,13 +56,14 @@ def run_segmentation_analysis(
     selected_class_names: set[str],
 ) -> list[SegmentationMask]:
     """Resize the frame, run YOLO segmentation inference, and return full-frame masks."""
-    frame_h, frame_w, _ = frame.shape
-    new_width = min(INFERENCE_WIDTH, frame_w)
-    new_height = int(frame_h * (new_width / frame_w))
-    resized_frame = cv2.resize(frame, (new_width, new_height))
-
-    results = run_model_inference(segmentation_model, resized_frame, device)
-    return extract_segmentation_masks(results, segmentation_model, frame_w, frame_h, selected_class_names)
+    inference = run_resized_model_inference(segmentation_model, frame, device)
+    return extract_segmentation_masks(
+        inference.results,
+        segmentation_model,
+        inference.frame_width,
+        inference.frame_height,
+        selected_class_names,
+    )
 
 
 def draw_segmentation_masks(frame: np.ndarray, segmentations: list[SegmentationMask], display_threshold: float = 0.5) -> None:

@@ -13,7 +13,7 @@ from worldcam.menu.constants import (
     MENU_EVENT_SEGMENTATION,
     MENU_EVENT_THRESHOLD,
 )
-from worldcam.menu.state import MenuState
+from worldcam.menu.state import MenuChanges, MenuSnapshot, MenuState
 from worldcam.menu.window import run_class_menu_process
 
 
@@ -59,8 +59,8 @@ def close_class_menu_window(menu_state: MenuState) -> None:
     menu_state.menu_process = None
 
 
-def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) -> tuple[bool, bool, bool, bool, bool, bool]:
-    """Apply pending menu-process events and return change flags."""
+def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) -> MenuChanges:
+    """Apply pending menu-process events and return named change flags."""
     try:
         while True:
             event_name, payload = menu_state.event_queue.get_nowait()
@@ -96,12 +96,13 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
         menu_state.menu_process = None
         menu_state.is_open = False
 
-    changes = (
-        menu_state.class_selection_changed,
-        menu_state.pose_toggled,
-        menu_state.sahi_toggled,
-        menu_state.tracking_toggled,
-        menu_state.segmentation_toggled,
+    changes = MenuChanges(
+        class_selection_changed=menu_state.class_selection_changed,
+        pose_toggled=menu_state.pose_toggled,
+        sahi_toggled=menu_state.sahi_toggled,
+        tracking_toggled=menu_state.tracking_toggled,
+        segmentation_toggled=menu_state.segmentation_toggled,
+        threshold_changed=menu_state.threshold_changed,
     )
     menu_state.class_selection_changed = False
     menu_state.pose_toggled = False
@@ -112,15 +113,15 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
     return changes
 
 
-def snapshot_menu_state(menu_state: MenuState, selected_class_names: set[str]) -> tuple[set[str], bool, bool, bool, bool, float]:
+def snapshot_menu_state(menu_state: MenuState, selected_class_names: set[str]) -> MenuSnapshot:
     """Return a stable snapshot of selected classes, feature toggles, and display threshold."""
-    return (
-        set(selected_class_names),
-        menu_state.pose_enabled,
-        menu_state.sahi_enabled,
-        menu_state.tracking_enabled,
-        menu_state.segmentation_enabled,
-        menu_state.display_threshold,
+    return MenuSnapshot(
+        selected_class_names=set(selected_class_names),
+        pose_enabled=menu_state.pose_enabled,
+        sahi_enabled=menu_state.sahi_enabled,
+        tracking_enabled=menu_state.tracking_enabled,
+        segmentation_enabled=menu_state.segmentation_enabled,
+        display_threshold=menu_state.display_threshold,
     )
 
 
@@ -129,32 +130,32 @@ def handle_class_menu_key(
     class_names: list[str],
     selected_class_names: set[str],
     menu_state: MenuState,
-) -> tuple[bool, bool, bool, bool, bool]:
-    """Update menu state and return class-change, pose-toggle, SAHI-toggle, tracking-toggle and segmentation-toggle."""
+) -> MenuChanges:
+    """Update menu state and return named change flags."""
     if key == ord("m"):
         if menu_state.is_open:
             close_class_menu_window(menu_state)
         else:
             start_class_menu_window(class_names, selected_class_names, menu_state)
-        return False, False, False, False, False
+        return MenuChanges()
 
     if not menu_state.is_open:
-        return False, False, False, False, False
+        return MenuChanges()
 
     if key == ord("p"):
         menu_state.pose_enabled = not menu_state.pose_enabled
-        return False, True, False, False, False
+        return MenuChanges(pose_toggled=True)
 
     if key == ord("a"):
         menu_state.sahi_enabled = not menu_state.sahi_enabled
-        return False, False, True, False, False
+        return MenuChanges(sahi_toggled=True)
 
     if key == ord("t"):
         menu_state.tracking_enabled = not menu_state.tracking_enabled
-        return False, False, False, True, False
+        return MenuChanges(tracking_toggled=True)
 
     if key == ord("g"):
         menu_state.segmentation_enabled = not menu_state.segmentation_enabled
-        return False, False, False, False, True
+        return MenuChanges(segmentation_toggled=True)
 
-    return False, False, False, False, False
+    return MenuChanges()

@@ -1,10 +1,12 @@
 """YOLO model loading helpers."""
 
+from dataclasses import dataclass
 import importlib
 import importlib.metadata
 import platform
 import sys
 
+import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
@@ -22,6 +24,19 @@ from worldcam.config import (
     SEGMENTATION_MODEL_ONNX,
     SEGMENTATION_MODEL_PT,
 )
+
+
+@dataclass(frozen=True)
+class ResizedInferenceResult:
+    """YOLO inference output with metadata for original-frame scaling."""
+
+    results: object
+    scale_x: float
+    scale_y: float
+    frame_width: int
+    frame_height: int
+    inference_width: int
+    inference_height: int
 
 
 def installed_version(package_name: str) -> str:
@@ -70,6 +85,25 @@ def run_model_inference(model: YOLO, image: np.ndarray, device: str):
     if is_tensorrt_model(model):
         return model(image, verbose=False)[0]
     return model(image, verbose=False, device=device)[0]
+
+
+def run_resized_model_inference(model: YOLO, frame: np.ndarray, device: str) -> ResizedInferenceResult:
+    """Resize a frame to the common inference width, run YOLO, and return scaling metadata."""
+    frame_h, frame_w, _ = frame.shape
+    new_width = min(INFERENCE_WIDTH, frame_w)
+    new_height = int(frame_h * (new_width / frame_w))
+    resized_frame = cv2.resize(frame, (new_width, new_height))
+
+    results = run_model_inference(model, resized_frame, device)
+    return ResizedInferenceResult(
+        results=results,
+        scale_x=frame_w / new_width,
+        scale_y=frame_h / new_height,
+        frame_width=frame_w,
+        frame_height=frame_h,
+        inference_width=new_width,
+        inference_height=new_height,
+    )
 
 
 def warm_up_model(model: YOLO, label: str, device: str) -> None:

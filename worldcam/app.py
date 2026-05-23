@@ -45,38 +45,26 @@ def handle_menu_changes(
     object_tracker: ObjectTracker,
 ) -> None:
     """Apply keyboard and menu-process changes, resetting affected cached analysis state."""
-    (
-        keyboard_class_changed,
-        keyboard_pose_toggled,
-        keyboard_sahi_toggled,
-        keyboard_tracking_toggled,
-        keyboard_segmentation_toggled
-    ) = handle_class_menu_key(
+    keyboard_changes = handle_class_menu_key(
         key,
         class_names,
         selected_class_names,
         menu_state,
     )
-    (
-        mouse_class_changed,
-        mouse_pose_toggled,
-        mouse_sahi_toggled,
-        mouse_tracking_toggled,
-        mouse_segmentation_toggled
-    ) = consume_menu_changes(menu_state, selected_class_names)
+    menu_changes = consume_menu_changes(menu_state, selected_class_names)
+    changes = keyboard_changes.merge(menu_changes)
 
-    class_selection_changed = keyboard_class_changed or mouse_class_changed
-    pose_toggled = keyboard_pose_toggled or mouse_pose_toggled
-    sahi_toggled = keyboard_sahi_toggled or mouse_sahi_toggled
-    tracking_toggled = keyboard_tracking_toggled or mouse_tracking_toggled
-    segmentation_toggled = keyboard_segmentation_toggled or mouse_segmentation_toggled
-
-    if class_selection_changed or sahi_toggled or tracking_toggled or segmentation_toggled:
+    if (
+        changes.class_selection_changed
+        or changes.sahi_toggled
+        or changes.tracking_toggled
+        or changes.segmentation_toggled
+    ):
         runtime.latest_detections = []
         runtime.latest_segmentations = []
         runtime.latest_object_tracks = []
         object_tracker.reset()
-    if pose_toggled and not menu_state.pose_enabled:
+    if changes.pose_toggled and not menu_state.pose_enabled:
         runtime.latest_poses = []
 
 
@@ -130,14 +118,7 @@ def main() -> None:
 
             register_frame_received(runtime, read_duration)
 
-            (
-                selected_snapshot,
-                pose_enabled,
-                sahi_enabled,
-                tracking_enabled,
-                segmentation_enabled,
-                display_threshold,
-            ) = snapshot_menu_state(menu_state, selected_class_names)
+            menu_snapshot = snapshot_menu_state(menu_state, selected_class_names)
             if runtime.frame_count % FRAME_SKIP == 0:
                 pose_model, segmentation_model = update_runtime_analysis(
                     runtime,
@@ -146,11 +127,11 @@ def main() -> None:
                     pose_model,
                     segmentation_model,
                     device,
-                    selected_snapshot,
-                    pose_enabled,
-                    segmentation_enabled,
-                    sahi_enabled,
-                    tracking_enabled,
+                    menu_snapshot.selected_class_names,
+                    menu_snapshot.pose_enabled,
+                    menu_snapshot.segmentation_enabled,
+                    menu_snapshot.sahi_enabled,
+                    menu_snapshot.tracking_enabled,
                     object_tracker,
                 )
 
@@ -160,7 +141,7 @@ def main() -> None:
                 runtime.latest_detections,
                 runtime.latest_poses,
                 runtime.latest_segmentations,
-                display_threshold,
+                menu_snapshot.display_threshold,
                 runtime.latest_object_tracks,
                 stream_index,
                 stream_total,
