@@ -102,7 +102,6 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
         menu_state.sahi_toggled,
         menu_state.tracking_toggled,
         menu_state.segmentation_toggled,
-        menu_state.threshold_changed,
     )
     menu_state.class_selection_changed = False
     menu_state.pose_toggled = False
@@ -130,32 +129,32 @@ def handle_class_menu_key(
     class_names: list[str],
     selected_class_names: set[str],
     menu_state: MenuState,
-) -> tuple[bool, bool, bool, bool, bool, bool]:
-    """Update menu state and return class-change, pose-toggle, SAHI-toggle, tracking-toggle, segmentation-toggle, and threshold-change flags."""
+) -> tuple[bool, bool, bool, bool, bool]:
+    """Update menu state and return class-change, pose-toggle, SAHI-toggle, tracking-toggle and segmentation-toggle."""
     if key == ord("m"):
         if menu_state.is_open:
             close_class_menu_window(menu_state)
         else:
             start_class_menu_window(class_names, selected_class_names, menu_state)
-        return False, False, False, False, False, False
+        return False, False, False, False, False
 
     if not menu_state.is_open:
-        return False, False, False, False, False, False
+        return False, False, False, False, False
 
     if key == ord("p"):
         menu_state.pose_enabled = not menu_state.pose_enabled
-        return False, True, False, False, False, False
+        return False, True, False, False, False
 
     if key == ord("a"):
         menu_state.sahi_enabled = not menu_state.sahi_enabled
-        return False, False, True, False, False, False
+        return False, False, True, False, False
 
     if key == ord("t"):
         menu_state.tracking_enabled = not menu_state.tracking_enabled
-        return False, False, False, True, False, False
+        return False, False, False, True, False
 
     if key == ord("g"):
         menu_state.segmentation_enabled = not menu_state.segmentation_enabled
-        return False, False, False, False, True, False
+        return False, False, False, False, True
 
-    return False, False, False, False, False, False
+    return False, False, False, False, False

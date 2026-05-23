@@ -7,7 +7,7 @@ from worldcam.config import READ_WARN_SECONDS, STATS_LOG_SECONDS
 from worldcam.detection import Detection
 from worldcam.pose import Pose
 from worldcam.segmentation import SegmentationMask
-from worldcam.tracking import PersonTrack, PersonTracker
+from worldcam.tracking import ObjectTrack, ObjectTracker
 
 
 @dataclass
@@ -17,7 +17,7 @@ class RuntimeState:
     latest_detections: list[Detection] = field(default_factory=list)
     latest_poses: list[Pose] = field(default_factory=list)
     latest_segmentations: list[SegmentationMask] = field(default_factory=list)
-    latest_person_tracks: list[PersonTrack] = field(default_factory=list)
+    latest_object_tracks: list[ObjectTrack] = field(default_factory=list)
     frame_count: int = 0
     slow_reads: int = 0
     stream_read_failures: int = 0
@@ -28,13 +28,13 @@ class RuntimeState:
     current_fps: float = 0.0
 
 
-def reset_analysis_state(runtime: RuntimeState, person_tracker: PersonTracker) -> None:
+def reset_analysis_state(runtime: RuntimeState, object_tracker: ObjectTracker) -> None:
     """Clear cached analysis outputs and reset tracking state."""
     runtime.latest_detections = []
     runtime.latest_poses = []
     runtime.latest_segmentations = []
-    runtime.latest_person_tracks = []
-    person_tracker.reset()
+    runtime.latest_object_tracks = []
+    object_tracker.reset()
 
 
 def reset_stream_statistics(runtime: RuntimeState) -> None:

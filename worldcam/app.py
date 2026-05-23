@@ -19,7 +19,7 @@ from worldcam.runtime import (
 )
 from worldcam.streaming import configure_ffmpeg_http_headers, print_videoio_diagnostics
 from worldcam.stream_control import open_stream_resources, reconnect_current_stream, switch_stream
-from worldcam.tracking import PersonTracker
+from worldcam.tracking import ObjectTracker
 from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
 
 KEY_LEFT_VALUES = {81, 2424832}
@@ -42,7 +42,7 @@ def handle_menu_changes(
     selected_class_names: set[str],
     menu_state: MenuState,
     runtime: RuntimeState,
-    person_tracker: PersonTracker,
+    object_tracker: ObjectTracker,
 ) -> None:
     """Apply keyboard and menu-process changes, resetting affected cached analysis state."""
     (
@@ -50,8 +50,7 @@ def handle_menu_changes(
         keyboard_pose_toggled,
         keyboard_sahi_toggled,
         keyboard_tracking_toggled,
-        keyboard_segmentation_toggled,
-        _keyboard_threshold_changed,
+        keyboard_segmentation_toggled
     ) = handle_class_menu_key(
         key,
         class_names,
@@ -63,8 +62,7 @@ def handle_menu_changes(
         mouse_pose_toggled,
         mouse_sahi_toggled,
         mouse_tracking_toggled,
-        mouse_segmentation_toggled,
-        _mouse_threshold_changed,
+        mouse_segmentation_toggled
     ) = consume_menu_changes(menu_state, selected_class_names)
 
     class_selection_changed = keyboard_class_changed or mouse_class_changed
@@ -76,8 +74,8 @@ def handle_menu_changes(
     if class_selection_changed or sahi_toggled or tracking_toggled or segmentation_toggled:
         runtime.latest_detections = []
         runtime.latest_segmentations = []
-        runtime.latest_person_tracks = []
-        person_tracker.reset()
+        runtime.latest_object_tracks = []
+        object_tracker.reset()
     if pose_toggled and not menu_state.pose_enabled:
         runtime.latest_poses = []
 
@@ -104,7 +102,7 @@ def main() -> None:
         return
 
     runtime = RuntimeState()
-    person_tracker = PersonTracker()
+    object_tracker = ObjectTracker()
     class_names, selected_class_names = build_class_selection(model)
     menu_state = MenuState()
     cv2.namedWindow(MAIN_WINDOW_NAME)
@@ -124,7 +122,7 @@ def main() -> None:
                 try:
                     resources = reconnect_current_stream(resources, stream_index, stream_total)
                     runtime.stream_read_failures = 0
-                    reset_analysis_state(runtime, person_tracker)
+                    reset_analysis_state(runtime, object_tracker)
                     continue
                 except RuntimeError as exc:
                     print(f"Erreur pendant la reconnexion automatique : {exc}")
@@ -153,7 +151,7 @@ def main() -> None:
                     segmentation_enabled,
                     sahi_enabled,
                     tracking_enabled,
-                    person_tracker,
+                    object_tracker,
                 )
 
             draw_overlay(
@@ -163,10 +161,10 @@ def main() -> None:
                 runtime.latest_poses,
                 runtime.latest_segmentations,
                 display_threshold,
-                runtime.latest_person_tracks,
+                runtime.latest_object_tracks,
                 stream_index,
                 stream_total,
-                person_tracker.vehicle_counts,
+                object_tracker.vehicle_counts,
             )
             runtime.next_frame_at = throttle_display(runtime.next_frame_at)
             cv2.imshow(MAIN_WINDOW_NAME, frame)
@@ -177,7 +175,7 @@ def main() -> None:
             if key in KEY_LEFT_VALUES or key in KEY_RIGHT_VALUES:
                 step = -1 if key in KEY_LEFT_VALUES else 1
                 resources, stream_index = switch_stream(resources, stream_index, step, stream_total)
-                reset_analysis_state(runtime, person_tracker)
+                reset_analysis_state(runtime, object_tracker)
                 reset_stream_statistics(runtime)
                 continue
             handle_menu_changes(
@@ -186,7 +184,7 @@ def main() -> None:
                 selected_class_names,
                 menu_state,
                 runtime,
-                person_tracker,
+                object_tracker,
             )
     finally:
         close_class_menu_window(menu_state)

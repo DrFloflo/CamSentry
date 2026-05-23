@@ -12,7 +12,7 @@ from worldcam.detection import Detection, draw_yolo_detections
 from worldcam.pose import Pose, draw_pose_detections
 from worldcam.segmentation import SegmentationMask, draw_segmentation_masks
 from worldcam.stream_control import release_stream_resources
-from worldcam.tracking import PersonTrack, draw_person_tracks, draw_vehicle_counts
+from worldcam.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
 from worldcam.ui import draw_fps, draw_stream_counter
 
 
@@ -23,7 +23,7 @@ def draw_overlay(
     poses: list[Pose],
     segmentations: list[SegmentationMask],
     display_threshold: float,
-    person_tracks: list[PersonTrack],
+    object_tracks: list[ObjectTrack],
     stream_index: int,
     stream_total: int,
     vehicle_counts: dict[str, int],
@@ -31,7 +31,7 @@ def draw_overlay(
     """Draw every visual overlay on the current frame."""
     draw_segmentation_masks(frame, segmentations, display_threshold)
     draw_yolo_detections(frame, detections, display_threshold)
-    draw_person_tracks(frame, person_tracks, display_threshold)
+    draw_object_tracks(frame, object_tracks, display_threshold)
     draw_pose_detections(frame, poses)
     draw_fps(frame, fps)
     draw_stream_counter(frame, stream_index, stream_total)

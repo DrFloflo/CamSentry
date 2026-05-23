@@ -7,7 +7,7 @@ from worldcam.models import load_pose_model, load_segmentation_model
 from worldcam.pose import Pose, run_pose_analysis
 from worldcam.runtime import RuntimeState
 from worldcam.segmentation import SegmentationMask, run_segmentation_analysis
-from worldcam.tracking import PersonTracker
+from worldcam.tracking import ObjectTracker
 
 
 def run_model_analysis(
@@ -78,7 +78,7 @@ def update_runtime_analysis(
     segmentation_enabled: bool,
     sahi_enabled: bool,
     tracking_enabled: bool,
-    person_tracker: PersonTracker,
+    object_tracker: ObjectTracker,
 ) -> tuple[YOLO | None, YOLO | None]:
     """Run enabled analyses and refresh runtime result caches."""
     (
@@ -103,9 +103,9 @@ def update_runtime_analysis(
     )
 
     if tracking_enabled:
-        runtime.latest_person_tracks = person_tracker.update(runtime.latest_detections)
+        runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections)
     else:
-        runtime.latest_person_tracks = []
-        person_tracker.reset()
+        runtime.latest_object_tracks = []
+        object_tracker.reset()
 
     return pose_model, segmentation_model
