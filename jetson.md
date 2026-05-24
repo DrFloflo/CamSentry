@@ -5,7 +5,7 @@ Target platform:
 - JetPack 6.2.1
 - Ubuntu 22.04.5 LTS
 - Kernel 5.15.148-tegra
-- L4T 36.4.4
+- L4T 36.4.7
 
 ## Files
 
