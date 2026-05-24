@@ -22,6 +22,12 @@ Run on the Jetson from the project root:
 docker compose build worldcam
 ```
 
+If the previous build failed during `pip install`, rebuild without cache so Docker re-runs the corrected pip configuration from `Dockerfile.jetson`:
+
+```bash
+docker compose build --no-cache worldcam
+```
+
 ## Start
 
 Foreground:
@@ -87,6 +93,23 @@ For an Orin Nano 8 Go, start with:
 - SAHI disabled if FPS is too low;
 - TensorRT engines generated locally on the Jetson;
 - a smaller YOLO model if `yolo26l` is too slow or uses too much memory.
+
+## Pip index troubleshooting
+
+The Dusty-NV base image can configure pip to use the Jetson wheel index first. If DNS or the redirect endpoint fails, pip may not find regular packages such as `pydantic`.
+
+`Dockerfile.jetson` forces standard PyPI as the primary index and keeps NVIDIA NGC as an extra index:
+
+```dockerfile
+ENV PIP_INDEX_URL=https://pypi.org/simple
+ENV PIP_EXTRA_INDEX_URL=https://pypi.ngc.nvidia.com
+```
+
+If this section changes, validate package resolution with:
+
+```bash
+docker compose build --no-cache worldcam
+```
 
 ## Base image note
 

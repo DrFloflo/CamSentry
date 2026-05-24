@@ -3,6 +3,8 @@ FROM dustynv/l4t-pytorch:r36.4.0
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
+ENV PIP_INDEX_URL=https://pypi.org/simple
+ENV PIP_EXTRA_INDEX_URL=https://pypi.ngc.nvidia.com
 
 WORKDIR /app
 
@@ -19,8 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-jetson.txt /app/requirements-jetson.txt
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r /app/requirements-jetson.txt
+RUN python3 -m pip install --upgrade pip --index-url https://pypi.org/simple && \
+    python3 -m pip install --index-url https://pypi.org/simple --extra-index-url https://pypi.ngc.nvidia.com -r /app/requirements-jetson.txt
 
 COPY . /app
 
