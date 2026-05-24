@@ -9,24 +9,20 @@ Target platform:
 
 ## Files
 
-- `Dockerfile.jetson`: Jetson/L4T image used to run WorldCam.
-- `requirements-jetson.txt`: Python dependencies installed on top of the Jetson image. Do not install `torch` or `opencv-python` from PyPI here; use the Jetson image packages.
-- `docker-compose.yaml`: Runs WorldCam in headless mode on port 8080.
-- `.dockerignore`: Keeps virtualenvs and heavyweight model artifacts out of the Docker build context.
+- `docker-compose.yaml`: Runs WorldCam directly from the official Ultralytics Jetson image in headless mode on port 8080.
+- `Dockerfile.jetson`: kept only as an experimental/custom build reference; it is not used by the current compose service.
+- `requirements-jetson.txt`: kept only for custom builds; it is not installed by the current compose service.
+- `.dockerignore`: used only when building a custom image.
 
-## Build
+## Pull the official Ultralytics Jetson image
 
-Run on the Jetson from the project root:
-
-```bash
-docker compose build worldcam
-```
-
-If the previous build failed during `pip install`, rebuild without cache so Docker re-runs the corrected pip configuration from `Dockerfile.jetson`:
+Run on the Jetson:
 
 ```bash
-docker compose build --no-cache worldcam
+docker pull ultralytics/ultralytics:latest-jetson-jetpack6
 ```
+
+The compose service uses this image directly and does not build a custom image.
 
 ## Start
 
@@ -94,35 +90,27 @@ For an Orin Nano 8 Go, start with:
 - TensorRT engines generated locally on the Jetson;
 - a smaller YOLO model if `yolo26l` is too slow or uses too much memory.
 
-## Pip and PyTorch troubleshooting
+## Image note
 
-The Dusty-NV base image already contains Jetson-compatible GPU packages such as PyTorch, CUDA bindings and OpenCV. During the Docker build, pip must not replace them with generic PyPI wheels or NVIDIA server wheels.
+`docker-compose.yaml` uses:
 
-`Dockerfile.jetson` therefore uses standard PyPI for regular Python packages:
-
-```dockerfile
-ENV PIP_INDEX_URL=https://pypi.org/simple
+```yaml
+image: ultralytics/ultralytics:latest-jetson-jetpack6
 ```
 
-`requirements-jetson.txt` intentionally does not include `torch`, `torchvision`, `opencv-python` or `ultralytics`. Ultralytics is installed separately with `--no-deps` so it does not pull a new PyTorch/CUDA stack over the prebuilt Jetson one:
+This avoids custom pip installation of Ultralytics, PyTorch and CUDA packages. If this image does not contain one of the extra app dependencies, install it only after checking that pip does not replace `torch`, `torchvision`, `opencv-python` or CUDA packages.
 
-```dockerfile
-python3 -m pip install --index-url https://pypi.org/simple -r /app/requirements-jetson.txt && \
-    python3 -m pip install --index-url https://pypi.org/simple --no-deps ultralytics
-```
+## Quick manual run without compose
 
-If this section changes, validate package resolution with:
+From the project root on the Jetson:
 
 ```bash
-docker compose build --no-cache worldcam
+docker run --rm -it \
+  --ipc=host \
+  --runtime=nvidia \
+  --network=host \
+  -w /app \
+  -v "$PWD:/app" \
+  ultralytics/ultralytics:latest-jetson-jetpack6 \
+  python3 -m worldcam.main --headless --stream-host 0.0.0.0 --stream-port 8080
 ```
-
-## Base image note
-
-`Dockerfile.jetson` currently uses:
-
-```dockerfile
-FROM nvcr.io/nvidia/l4t-pytorch:r36.4.0-pth2.6-py3
-```
-
-If NVIDIA changes available tags, replace it with an L4T R36 / JetPack 6 compatible PyTorch image for your installed L4T release.

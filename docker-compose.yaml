@@ -1,18 +1,18 @@
 services:
   worldcam:
-    build:
-      context: .
-      dockerfile: Dockerfile.jetson
+    image: ultralytics/ultralytics:latest-jetson-jetpack6
     container_name: worldcam
     runtime: nvidia
     network_mode: host
     ipc: host
     restart: unless-stopped
+    working_dir: /app
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: all
       PYTHONUNBUFFERED: "1"
     volumes:
+      - ./:/app
       - ./models:/app/models
     command:
       - python3
