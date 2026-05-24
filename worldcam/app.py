@@ -159,6 +159,7 @@ def main() -> None:
                 stream_index,
                 stream_total,
                 object_tracker.vehicle_counts,
+                menu_snapshot.tracking_enabled,
             )
             runtime.next_frame_at = throttle_display(runtime.next_frame_at)
             cv2.imshow(MAIN_WINDOW_NAME, frame)

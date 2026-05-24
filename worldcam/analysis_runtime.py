@@ -2,7 +2,7 @@
 
 from ultralytics import YOLO
 
-from worldcam.detection import Detection, run_sahi_analysis, run_yolo_analysis
+from worldcam.detection import Detection, deduplicate_detections, run_sahi_analysis, run_yolo_analysis
 from worldcam.models import load_pose_model, load_segmentation_model
 from worldcam.pose import Pose, run_pose_analysis
 from worldcam.runtime import RuntimeState
@@ -101,6 +101,8 @@ def update_runtime_analysis(
         segmentation_enabled,
         sahi_enabled,
     )
+
+    runtime.latest_detections = deduplicate_detections(runtime.latest_detections)
 
     if tracking_enabled:
         runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections)

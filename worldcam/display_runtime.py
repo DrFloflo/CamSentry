@@ -27,11 +27,14 @@ def draw_overlay(
     stream_index: int,
     stream_total: int,
     vehicle_counts: dict[str, int],
+    tracking_enabled: bool,
 ) -> None:
     """Draw every visual overlay on the current frame."""
     draw_segmentation_masks(frame, segmentations, display_threshold)
-    draw_yolo_detections(frame, detections, display_threshold)
-    draw_object_tracks(frame, object_tracks, display_threshold)
+    if tracking_enabled:
+        draw_object_tracks(frame, object_tracks, display_threshold)
+    else:
+        draw_yolo_detections(frame, detections, display_threshold)
     draw_pose_detections(frame, poses)
     draw_fps(frame, fps)
     draw_stream_counter(frame, stream_index, stream_total)

@@ -19,6 +19,11 @@ from worldcam.models import run_model_inference, run_resized_model_inference
 
 Detection = tuple[int, int, int, int, str, float]
 
+DETECTION_DEDUP_IOU_THRESHOLD = 0.45
+DETECTION_DEDUP_CONTAINMENT_THRESHOLD = 0.75
+DETECTION_DEDUP_CENTER_DISTANCE_FACTOR = 0.35
+DETECTION_DEDUP_MIN_IOU_FOR_CENTER_MATCH = 0.10
+
 
 def extract_yolo_detections(
     results,
@@ -160,6 +165,95 @@ def run_sahi_analysis(
     nms_postprocess = NMSPostprocess(match_threshold=0.5, match_metric="IOU", class_agnostic=False)
     combined_predictions = nms_postprocess(object_predictions)
     return convert_sahi_predictions_to_detections(combined_predictions, frame_w, frame_h)
+
+
+def get_detection_class_name(detection: Detection) -> str:
+    """Extract the class name from a WorldCam detection label."""
+    return detection[4].rsplit(" ", 1)[0]
+
+
+def calculate_detection_iou(detection_a: Detection, detection_b: Detection) -> float:
+    """Calculate intersection-over-union for two detection boxes."""
+    ax1, ay1, ax2, ay2 = detection_a[:4]
+    bx1, by1, bx2, by2 = detection_b[:4]
+
+    intersection_x1 = max(ax1, bx1)
+    intersection_y1 = max(ay1, by1)
+    intersection_x2 = min(ax2, bx2)
+    intersection_y2 = min(ay2, by2)
+
+    intersection_width = max(0, intersection_x2 - intersection_x1)
+    intersection_height = max(0, intersection_y2 - intersection_y1)
+    intersection_area = intersection_width * intersection_height
+
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    union_area = area_a + area_b - intersection_area
+    if union_area <= 0:
+        return 0.0
+    return intersection_area / union_area
+
+
+def calculate_detection_containment(detection_a: Detection, detection_b: Detection) -> float:
+    """Return the intersection ratio over the smaller detection area."""
+    ax1, ay1, ax2, ay2 = detection_a[:4]
+    bx1, by1, bx2, by2 = detection_b[:4]
+
+    intersection_x1 = max(ax1, bx1)
+    intersection_y1 = max(ay1, by1)
+    intersection_x2 = min(ax2, bx2)
+    intersection_y2 = min(ay2, by2)
+
+    intersection_width = max(0, intersection_x2 - intersection_x1)
+    intersection_height = max(0, intersection_y2 - intersection_y1)
+    intersection_area = intersection_width * intersection_height
+
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    smaller_area = min(area_a, area_b)
+    if smaller_area <= 0:
+        return 0.0
+    return intersection_area / smaller_area
+
+
+def calculate_detection_center_distance(detection_a: Detection, detection_b: Detection) -> float:
+    """Calculate Euclidean distance between two detection centers."""
+    ax1, ay1, ax2, ay2 = detection_a[:4]
+    bx1, by1, bx2, by2 = detection_b[:4]
+    center_a = ((ax1 + ax2) / 2.0, (ay1 + ay2) / 2.0)
+    center_b = ((bx1 + bx2) / 2.0, (by1 + by2) / 2.0)
+    return float(np.hypot(center_a[0] - center_b[0], center_a[1] - center_b[1]))
+
+
+def is_duplicate_detection(candidate: Detection, kept_detection: Detection) -> bool:
+    """Return whether two same-class detections likely describe the same object."""
+    if get_detection_class_name(candidate) != get_detection_class_name(kept_detection):
+        return False
+
+    iou = calculate_detection_iou(candidate, kept_detection)
+    if iou >= DETECTION_DEDUP_IOU_THRESHOLD:
+        return True
+
+    containment = calculate_detection_containment(candidate, kept_detection)
+    if containment >= DETECTION_DEDUP_CONTAINMENT_THRESHOLD:
+        return True
+
+    candidate_width = max(1, candidate[2] - candidate[0])
+    candidate_height = max(1, candidate[3] - candidate[1])
+    kept_width = max(1, kept_detection[2] - kept_detection[0])
+    kept_height = max(1, kept_detection[3] - kept_detection[1])
+    center_distance_limit = min(candidate_width, candidate_height, kept_width, kept_height) * DETECTION_DEDUP_CENTER_DISTANCE_FACTOR
+    return iou >= DETECTION_DEDUP_MIN_IOU_FOR_CENTER_MATCH and calculate_detection_center_distance(candidate, kept_detection) <= center_distance_limit
+
+
+def deduplicate_detections(detections: list[Detection]) -> list[Detection]:
+    """Suppress duplicate detections by class before display and tracking."""
+    kept_detections: list[Detection] = []
+    for detection in sorted(detections, key=lambda item: item[5], reverse=True):
+        if any(is_duplicate_detection(detection, kept_detection) for kept_detection in kept_detections):
+            continue
+        kept_detections.append(detection)
+    return kept_detections
 
 
 def get_detection_color(label: str) -> tuple[int, int, int]:
