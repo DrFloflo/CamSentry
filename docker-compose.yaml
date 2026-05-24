@@ -1,17 +1,25 @@
-version: "3.9"
-
 services:
-  jetson-inference:
-    image: dustynv/jetson-inference:r32.7.1
-    container_name: jetson-inference
-
+  worldcam:
+    build:
+      context: .
+      dockerfile: Dockerfile.jetson
+    container_name: worldcam
     runtime: nvidia
     network_mode: host
-
-    stdin_open: true
-    tty: true
-
-    volumes:
-      - /home/xedge/Documents/jetson-inference:/jetson-inference
-
+    ipc: host
     restart: unless-stopped
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./models:/app/models
+    command:
+      - python3
+      - -m
+      - worldcam.main
+      - --headless
+      - --stream-host
+      - 0.0.0.0
+      - --stream-port
+      - "8080"

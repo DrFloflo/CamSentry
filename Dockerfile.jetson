@@ -1,0 +1,29 @@
+FROM nvcr.io/nvidia/l4t-pytorch:r36.4.0-pth2.6-py3
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libgl1 \
+    libglib2.0-0 \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-jetson.txt /app/requirements-jetson.txt
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install -r /app/requirements-jetson.txt
+
+COPY . /app
+
+EXPOSE 8080
+
+CMD ["python3", "-m", "worldcam.main", "--headless", "--stream-host", "0.0.0.0", "--stream-port", "8080"]
