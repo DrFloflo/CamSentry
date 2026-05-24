@@ -1,17 +1,23 @@
 """Lightweight backend-independent object tracking utilities."""
 
 from dataclasses import dataclass, field
+from datetime import date
 import math
 
 import cv2
 import numpy as np
 
 from worldcam.config import (
+    COUNTING_ZONE_REAL_LENGTH_METERS,
+    COUNTING_ZONE_REAL_WIDTH_METERS,
+    FRAME_SKIP,
     PERSON_TRACK_DEBUG,
     PERSON_TRACK_MAX_AGE,
     PERSON_TRACK_MAX_DISTANCE,
     PERSON_TRACK_MIN_IOU,
     PERSON_TRACK_TRAIL_LENGTH,
+    SPEED_ESTIMATION_ENABLED,
+    TARGET_FPS,
 )
 from worldcam.counting_zone import ZonePoints, point_inside_zone
 from worldcam.detection import Detection, get_detection_color
@@ -30,6 +36,38 @@ class CountedVehicle:
     bbox: tuple[int, int, int, int]
     track_id: int | None = None
     age: int = 0
+
+
+def estimate_track_speed_kmh(track: "ObjectTrack", zone_points: ZonePoints) -> float | None:
+    """Estimate track speed by projecting zone progress into an approximate real rectangle."""
+    if not SPEED_ESTIMATION_ENABLED or len(zone_points) < 4 or len(track.trail) < 2:
+        return None
+
+    homography = cv2.getPerspectiveTransform(
+        np.array(zone_points[:4], dtype=np.float32),
+        np.array(
+            [
+                (0.0, 0.0),
+                (COUNTING_ZONE_REAL_WIDTH_METERS, 0.0),
+                (COUNTING_ZONE_REAL_WIDTH_METERS, COUNTING_ZONE_REAL_LENGTH_METERS),
+                (0.0, COUNTING_ZONE_REAL_LENGTH_METERS),
+            ],
+            dtype=np.float32,
+        ),
+    )
+    trail_points = np.array(track.trail, dtype=np.float32).reshape(-1, 1, 2)
+    projected_points = cv2.perspectiveTransform(trail_points, homography).reshape(-1, 2)
+
+    distance_meters = 0.0
+    for point_index in range(1, len(projected_points)):
+        previous_x, previous_y = projected_points[point_index - 1]
+        current_x, current_y = projected_points[point_index]
+        distance_meters += math.hypot(current_x - previous_x, current_y - previous_y)
+
+    duration_seconds = (len(projected_points) - 1) * FRAME_SKIP / TARGET_FPS
+    if duration_seconds <= 0.0 or distance_meters <= 0.0:
+        return None
+    return distance_meters / duration_seconds * 3.6
 
 
 @dataclass
@@ -58,10 +96,23 @@ class VehicleCounter:
     def __init__(self) -> None:
         self.counts = {VEHICLE_COUNT_KEY: 0}
         self.counted_memory: list[CountedVehicle] = []
+        self.count_date = date.today()
 
     def reset_memory(self) -> None:
         """Clear compatibility memory without resetting cumulative counts."""
         self.counted_memory.clear()
+
+    def reset_daily_counts_if_needed(self) -> None:
+        """Reset vehicle counts when the local calendar day changes, logging the previous total first."""
+        current_date = date.today()
+        if current_date == self.count_date:
+            return
+
+        previous_total = self.counts.get(VEHICLE_COUNT_KEY, 0)
+        print(f"Daily vehicle counter reset: date={self.count_date.isoformat()}, vehicles_counted={previous_total}")
+        self.counts[VEHICLE_COUNT_KEY] = 0
+        self.counted_memory.clear()
+        self.count_date = current_date
 
     def age_counted_memory(self) -> None:
         """Keep the legacy compatibility hook without suppressing future vehicles."""
@@ -76,6 +127,12 @@ class VehicleCounter:
             if counting_zone_enabled and not point_inside_zone(track.center, zone_points):
                 continue
             self.counts[VEHICLE_COUNT_KEY] += 1
+            speed_kmh = estimate_track_speed_kmh(track, zone_points)
+            speed_text = "n/a" if speed_kmh is None else f"{speed_kmh:.1f} km/h"
+            print(
+                f"Véhicule compté: id={track.track_id}, classe={track.class_name}, "
+                f"vitesse_estimée={speed_text}, total={self.counts[VEHICLE_COUNT_KEY]}"
+            )
             track.counted = True
 
     def refresh_counted_memory(self, tracks: list[ObjectTrack]) -> None:
@@ -172,6 +229,7 @@ class ObjectTracker:
         counting_zone_enabled: bool = False,
     ) -> list[ObjectTrack]:
         """Update tracks from the latest selected detections and return active tracks."""
+        self.vehicle_counter.reset_daily_counts_if_needed()
         self.vehicle_counter.age_counted_memory()
         object_boxes = [
             (x1, y1, x2, y2, confidence, get_detection_class_name(detection))
@@ -312,7 +370,7 @@ def draw_vehicle_counts(frame: np.ndarray, vehicle_counts: dict[str, int]) -> No
     thickness = 2
     margin = 12
     line_height = 26
-    labels = [f"Nb de véhicules aujourd'hui: {vehicle_counts.get(VEHICLE_COUNT_KEY, 0)}"]
+    labels = [f"Nb de vehicules aujourd'hui: {vehicle_counts.get(VEHICLE_COUNT_KEY, 0)}"]
     y = max(margin + line_height, frame.shape[0] - margin - line_height * (len(labels) - 1))
 
     for label in labels:
