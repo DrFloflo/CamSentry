@@ -94,15 +94,21 @@ For an Orin Nano 8 Go, start with:
 - TensorRT engines generated locally on the Jetson;
 - a smaller YOLO model if `yolo26l` is too slow or uses too much memory.
 
-## Pip index troubleshooting
+## Pip and PyTorch troubleshooting
 
-The Dusty-NV base image can configure pip to use the Jetson wheel index first. If DNS or the redirect endpoint fails, pip may not find regular packages such as `pydantic`.
+The Dusty-NV base image already contains Jetson-compatible GPU packages such as PyTorch, CUDA bindings and OpenCV. During the Docker build, pip must not replace them with generic PyPI wheels or NVIDIA server wheels.
 
-`Dockerfile.jetson` forces standard PyPI as the primary index and keeps NVIDIA NGC as an extra index:
+`Dockerfile.jetson` therefore uses standard PyPI for regular Python packages:
 
 ```dockerfile
 ENV PIP_INDEX_URL=https://pypi.org/simple
-ENV PIP_EXTRA_INDEX_URL=https://pypi.ngc.nvidia.com
+```
+
+`requirements-jetson.txt` intentionally does not include `torch`, `torchvision`, `opencv-python` or `ultralytics`. Ultralytics is installed separately with `--no-deps` so it does not pull a new PyTorch/CUDA stack over the prebuilt Jetson one:
+
+```dockerfile
+python3 -m pip install --index-url https://pypi.org/simple -r /app/requirements-jetson.txt && \
+    python3 -m pip install --index-url https://pypi.org/simple --no-deps ultralytics
 ```
 
 If this section changes, validate package resolution with:

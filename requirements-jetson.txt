@@ -2,10 +2,16 @@ pydantic
 pydantic-settings
 python-dotenv
 requests
-ultralytics
 sahi
 fastapi
 uvicorn
 isort
 colored
 polygraphy
+PyYAML
+matplotlib
+pandas
+scipy
+psutil
+py-cpuinfo
+ultralytics-thop
