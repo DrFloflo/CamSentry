@@ -49,11 +49,11 @@ POSE_MODEL_ENGINE = "models/yolo26m-pose.engine"
 SEGMENTATION_MODEL_PT = "models/yolo26m-seg.pt"
 SEGMENTATION_MODEL_ONNX = "models/yolo26m-seg.onnx"
 SEGMENTATION_MODEL_ENGINE = "models/yolo26m-seg.engine"
-DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck"}
+DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck", "airplane"}
 INFERENCE_WIDTH = 640
 FRAME_SKIP = 2
 
-SAHI_ENABLED = False
+SAHI_ENABLED = True
 SAHI_CONFIDENCE_THRESHOLD = 0.25
 SAHI_SLICE_HEIGHT = 512
 SAHI_SLICE_WIDTH = 512
@@ -68,7 +68,7 @@ DETECTION_CLASS_COLORS = {
     "motorcycle": (255, 0, 0),
     "bus": (0, 255, 255),
     "truck": (255, 0, 255),
-    "cat": (180, 105, 255),
+    "airplane": (180, 105, 255),
 }
 DETECTION_FALLBACK_COLORS = [
     (0, 255, 0),

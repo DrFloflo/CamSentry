@@ -16,11 +16,10 @@ from worldcam.config import (
 from worldcam.counting_zone import ZonePoints, point_inside_zone
 from worldcam.detection import Detection, get_detection_color
 
-VEHICLE_COUNT_CLASSES = {"car", "truck"}
+VEHICLE_SOURCE_CLASSES = {"car", "truck", "bus", "motorcycle"}
+VEHICLE_COUNT_KEY = "vehicle"
 VEHICLE_COUNT_MIN_HITS = 3
-VEHICLE_COUNT_MEMORY_AGE = 30
-VEHICLE_COUNT_MAX_DISTANCE = 140.0
-VEHICLE_COUNT_MIN_IOU = 0.10
+ACTIVE_TRACK_OVERLAP_IOU_THRESHOLD = 0.80
 
 
 @dataclass
@@ -54,70 +53,53 @@ class ObjectTrack:
 
 
 class VehicleCounter:
-    """Cumulative car/truck counter with short-term duplicate suppression."""
+    """Cumulative vehicle counter for confirmed car/truck tracks."""
 
     def __init__(self) -> None:
-        self.counts = {class_name: 0 for class_name in sorted(VEHICLE_COUNT_CLASSES)}
+        self.counts = {VEHICLE_COUNT_KEY: 0}
         self.counted_memory: list[CountedVehicle] = []
 
     def reset_memory(self) -> None:
-        """Clear duplicate-suppression memory without resetting cumulative counts."""
+        """Clear compatibility memory without resetting cumulative counts."""
         self.counted_memory.clear()
 
     def age_counted_memory(self) -> None:
-        """Age and prune recently counted vehicle memory."""
-        kept_memory = []
-        for counted_vehicle in self.counted_memory:
-            counted_vehicle.age += 1
-            if counted_vehicle.age <= VEHICLE_COUNT_MEMORY_AGE:
-                kept_memory.append(counted_vehicle)
-        self.counted_memory = kept_memory
+        """Keep the legacy compatibility hook without suppressing future vehicles."""
+        self.counted_memory.clear()
 
     def update_counts(self, tracks: list[ObjectTrack], counting_zone_points: ZonePoints | None = None, counting_zone_enabled: bool = False) -> None:
-        """Count confirmed vehicle tracks once, optionally only when their center is inside the counting zone."""
+        """Count each confirmed vehicle track once, optionally only when its center is inside the counting zone."""
         zone_points = counting_zone_points or []
         for track in tracks:
-            if track.counted or track.class_name not in self.counts or track.hits < VEHICLE_COUNT_MIN_HITS:
+            if track.counted or track.class_name not in VEHICLE_SOURCE_CLASSES or track.hits < VEHICLE_COUNT_MIN_HITS:
                 continue
             if counting_zone_enabled and not point_inside_zone(track.center, zone_points):
                 continue
-            if self.is_recently_counted(track.class_name, track.bbox):
-                track.counted = True
-                continue
-            self.counts[track.class_name] += 1
+            self.counts[VEHICLE_COUNT_KEY] += 1
             track.counted = True
-            self.remember_counted(track)
 
     def refresh_counted_memory(self, tracks: list[ObjectTrack]) -> None:
-        """Keep counted vehicle memory aligned with active confirmed tracks."""
-        for track in tracks:
-            if not track.counted or track.class_name not in self.counts:
-                continue
-            for counted_vehicle in self.counted_memory:
-                if counted_vehicle.track_id == track.track_id:
-                    counted_vehicle.bbox = track.bbox
-                    counted_vehicle.age = 0
-                    break
+        """Keep the legacy compatibility hook without suppressing future vehicles."""
+        self.counted_memory.clear()
 
     def is_recently_counted(self, class_name: str, bbox: tuple[int, int, int, int]) -> bool:
         """Return whether a matching vehicle was already counted recently."""
-        for counted_vehicle in self.counted_memory:
-            if counted_vehicle.class_name != class_name:
-                continue
-            if calculate_iou(counted_vehicle.bbox, bbox) >= VEHICLE_COUNT_MIN_IOU:
-                return True
-            if calculate_center_distance(counted_vehicle.bbox, bbox) <= VEHICLE_COUNT_MAX_DISTANCE:
-                return True
         return False
 
     def remember_counted(self, track: ObjectTrack) -> None:
-        """Store a counted vehicle for a few updates to prevent duplicate counts."""
-        self.counted_memory.append(CountedVehicle(class_name=track.class_name, bbox=track.bbox, track_id=track.track_id))
+        """Keep the legacy compatibility hook without suppressing future vehicles."""
 
 
 def get_detection_class_name(detection: Detection) -> str:
     """Extract the class name from a WorldCam detection label."""
     return detection[4].rsplit(" ", 1)[0]
+
+
+def are_compatible_track_classes(track_class_name: str, detection_class_name: str) -> bool:
+    """Return whether a detection can update an existing track despite label jitter."""
+    if track_class_name == detection_class_name:
+        return True
+    return track_class_name in VEHICLE_SOURCE_CLASSES and detection_class_name in VEHICLE_SOURCE_CLASSES
 
 
 def calculate_iou(bbox_a: tuple[int, int, int, int], bbox_b: tuple[int, int, int, int]) -> float:
@@ -149,6 +131,17 @@ def calculate_center_distance(bbox_a: tuple[int, int, int, int], bbox_b: tuple[i
     center_a = ((ax1 + ax2) / 2.0, (ay1 + ay2) / 2.0)
     center_b = ((bx1 + bx2) / 2.0, (by1 + by2) / 2.0)
     return math.hypot(center_a[0] - center_b[0], center_a[1] - center_b[1])
+
+
+def should_replace_overlapping_track(candidate: ObjectTrack, kept_track: ObjectTrack) -> bool:
+    """Return whether an overlapping candidate is more reliable than the kept track."""
+    if candidate.counted != kept_track.counted:
+        return candidate.counted
+    if candidate.hits != kept_track.hits:
+        return candidate.hits > kept_track.hits
+    if candidate.confidence != kept_track.confidence:
+        return candidate.confidence > kept_track.confidence
+    return candidate.track_id < kept_track.track_id
 
 
 class ObjectTracker:
@@ -193,7 +186,7 @@ class ObjectTracker:
         candidates: list[tuple[float, float, int, int]] = []
         for track_id, track in self.tracks.items():
             for detection_index, (x1, y1, x2, y2, _confidence, class_name) in enumerate(object_boxes):
-                if track.class_name != class_name:
+                if not are_compatible_track_classes(track.class_name, class_name):
                     continue
                 bbox = (x1, y1, x2, y2)
                 iou = calculate_iou(track.bbox, bbox)
@@ -237,6 +230,7 @@ class ObjectTracker:
                 removed_track_ids.append(track_id)
                 del self.tracks[track_id]
 
+        self.suppress_overlapping_active_tracks()
         active_tracks = self.active_tracks()
         self.vehicle_counter.update_counts(active_tracks, counting_zone_points, counting_zone_enabled)
         self.vehicle_counter.refresh_counted_memory(active_tracks)
@@ -254,6 +248,37 @@ class ObjectTracker:
     def active_tracks(self) -> list[ObjectTrack]:
         """Return active tracks sorted by stable ID."""
         return [self.tracks[track_id] for track_id in sorted(self.tracks)]
+
+    def suppress_overlapping_active_tracks(self) -> None:
+        """Remove duplicate active tracks whose boxes overlap too strongly."""
+        kept_tracks: list[ObjectTrack] = []
+        removed_track_ids: set[int] = set()
+
+        for track in sorted(self.tracks.values(), key=lambda item: (item.counted, item.hits, item.confidence), reverse=True):
+            duplicate_index = next(
+                (
+                    index
+                    for index, kept_track in enumerate(kept_tracks)
+                    if are_compatible_track_classes(track.class_name, kept_track.class_name)
+                    and calculate_iou(track.bbox, kept_track.bbox) >= ACTIVE_TRACK_OVERLAP_IOU_THRESHOLD
+                ),
+                None,
+            )
+            if duplicate_index is None:
+                kept_tracks.append(track)
+                continue
+
+            kept_track = kept_tracks[duplicate_index]
+            if should_replace_overlapping_track(track, kept_track):
+                track.counted = track.counted or kept_track.counted
+                removed_track_ids.add(kept_track.track_id)
+                kept_tracks[duplicate_index] = track
+            else:
+                kept_track.counted = kept_track.counted or track.counted
+                removed_track_ids.add(track.track_id)
+
+        for track_id in removed_track_ids:
+            self.tracks.pop(track_id, None)
 
 
 def draw_object_tracks(frame: np.ndarray, tracks: list[ObjectTrack], display_threshold: float = 0.5) -> None:
@@ -281,16 +306,13 @@ def draw_object_tracks(frame: np.ndarray, tracks: list[ObjectTrack], display_thr
 
 
 def draw_vehicle_counts(frame: np.ndarray, vehicle_counts: dict[str, int]) -> None:
-    """Draw cumulative car and truck counters in the bottom-left corner."""
+    """Draw the cumulative vehicle counter in the bottom-left corner."""
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.7
     thickness = 2
     margin = 12
     line_height = 26
-    labels = [
-        f"Cars: {vehicle_counts.get('car', 0)}",
-        f"Trucks: {vehicle_counts.get('truck', 0)}",
-    ]
+    labels = [f"Vehicles: {vehicle_counts.get(VEHICLE_COUNT_KEY, 0)}"]
     y = max(margin + line_height, frame.shape[0] - margin - line_height * (len(labels) - 1))
 
     for label in labels:

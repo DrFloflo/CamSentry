@@ -53,10 +53,8 @@ def draw_counting_zone(
     counting_zone_enabled: bool,
     counting_zone_edit_enabled: bool,
 ) -> None:
-    """Draw the counting-zone free points and copyable coordinates without affecting counts."""
+    """Draw the counting-zone polygon with a subtle fill and unobtrusive edit handles."""
     points = counting_zone_points or []
-    label = f"counting_zone_points={points}"
-    cv2.putText(frame, label, (12, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
 
     if not (counting_zone_enabled or counting_zone_edit_enabled):
         return
@@ -67,10 +65,18 @@ def draw_counting_zone(
 
         contour = np.array(points, dtype=np.int32)
         is_closed = len(points) >= 3
-        cv2.polylines(frame, [contour], is_closed, color, 2)
+        if is_closed:
+            zone_overlay = frame.copy()
+            cv2.fillPoly(zone_overlay, [contour], (255, 255, 255))
+            cv2.addWeighted(zone_overlay, 0.12, frame, 0.88, 0, frame)
+        cv2.polylines(frame, [contour], is_closed, color, 1)
+
+    if not counting_zone_edit_enabled:
+        return
+
     for index, point in enumerate(points, start=1):
-        cv2.circle(frame, point, COUNTING_ZONE_HANDLE_RADIUS, COUNTING_ZONE_HANDLE_COLOR, -1)
-        cv2.putText(frame, str(index), (point[0] + 8, point[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COUNTING_ZONE_HANDLE_COLOR, 2)
+        cv2.circle(frame, point, max(3, COUNTING_ZONE_HANDLE_RADIUS // 2), COUNTING_ZONE_HANDLE_COLOR, 1)
+        cv2.putText(frame, str(index), (point[0] + 6, point[1] - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.4, COUNTING_ZONE_HANDLE_COLOR, 1)
 
 
 def throttle_display(next_frame_at: float) -> float:
