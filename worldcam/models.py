@@ -138,13 +138,13 @@ def load_backend_model(label: str, candidates: list[tuple[str, str]], device: st
 
 
 def load_yolo_model() -> tuple[YOLO, str]:
-    """Load YOLO26L, preferring TensorRT, then ONNX, then PyTorch."""
+    """Load YOLO, preferring TensorRT, then ONNX, then PyTorch."""
     patch_ultralytics_pose26()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Périphérique YOLO utilisé: {device}")
 
     model = load_backend_model(
-        "YOLO26L",
+        "YOLO",
         [("TensorRT", MODEL_ENGINE), ("ONNX", MODEL_ONNX), ("PyTorch", MODEL_PT)],
         device,
     )

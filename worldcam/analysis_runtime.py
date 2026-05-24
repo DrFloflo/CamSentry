@@ -31,7 +31,7 @@ def run_model_analysis(
         else:
             latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
     except Exception as exc:
-        print(f"Erreur pendant l'analyse YOLO26L: {exc}")
+        print(f"Erreur pendant l'analyse YOLO: {exc}")
 
     if segmentation_enabled:
         if segmentation_model is None:

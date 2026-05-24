@@ -53,7 +53,7 @@ def run_yolo_analysis(
     device: str,
     selected_class_names: set[str],
 ) -> list[Detection]:
-    """Resize the frame, run YOLO26L inference, and return detections for the original frame."""
+    """Resize the frame, run YOLO inference, and return detections for the original frame."""
     inference = run_resized_model_inference(model, frame, device)
     return extract_yolo_detections(
         inference.results,
