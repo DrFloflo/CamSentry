@@ -7,13 +7,15 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-from worldcam.config import FRAME_INTERVAL
+from worldcam.config import COUNTING_ZONE_COLOR, COUNTING_ZONE_EDIT_COLOR, COUNTING_ZONE_HANDLE_COLOR, COUNTING_ZONE_HANDLE_RADIUS, FRAME_INTERVAL
 from worldcam.detection import Detection, draw_yolo_detections
 from worldcam.pose import Pose, draw_pose_detections
 from worldcam.segmentation import SegmentationMask, draw_segmentation_masks
 from worldcam.stream_control import release_stream_resources
 from worldcam.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
 from worldcam.ui import draw_fps, draw_stream_counter
+
+ZonePoints = list[tuple[int, int]]
 
 
 def draw_overlay(
@@ -28,6 +30,9 @@ def draw_overlay(
     stream_total: int,
     vehicle_counts: dict[str, int],
     tracking_enabled: bool,
+    counting_zone_points: ZonePoints | None = None,
+    counting_zone_enabled: bool = False,
+    counting_zone_edit_enabled: bool = False,
 ) -> None:
     """Draw every visual overlay on the current frame."""
     draw_segmentation_masks(frame, segmentations, display_threshold)
@@ -39,6 +44,33 @@ def draw_overlay(
     draw_fps(frame, fps)
     draw_stream_counter(frame, stream_index, stream_total)
     draw_vehicle_counts(frame, vehicle_counts)
+    draw_counting_zone(frame, counting_zone_points, counting_zone_enabled, counting_zone_edit_enabled)
+
+
+def draw_counting_zone(
+    frame,
+    counting_zone_points: ZonePoints | None,
+    counting_zone_enabled: bool,
+    counting_zone_edit_enabled: bool,
+) -> None:
+    """Draw the counting-zone free points and copyable coordinates without affecting counts."""
+    points = counting_zone_points or []
+    label = f"counting_zone_points={points}"
+    cv2.putText(frame, label, (12, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+
+    if not (counting_zone_enabled or counting_zone_edit_enabled):
+        return
+
+    color = COUNTING_ZONE_EDIT_COLOR if counting_zone_edit_enabled else COUNTING_ZONE_COLOR
+    if len(points) >= 2:
+        import numpy as np
+
+        contour = np.array(points, dtype=np.int32)
+        is_closed = len(points) >= 3
+        cv2.polylines(frame, [contour], is_closed, color, 2)
+    for index, point in enumerate(points, start=1):
+        cv2.circle(frame, point, COUNTING_ZONE_HANDLE_RADIUS, COUNTING_ZONE_HANDLE_COLOR, -1)
+        cv2.putText(frame, str(index), (point[0] + 8, point[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COUNTING_ZONE_HANDLE_COLOR, 2)
 
 
 def throttle_display(next_frame_at: float) -> float:

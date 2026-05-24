@@ -7,6 +7,8 @@ from worldcam.menu.constants import (
     MENU_EVENT_CLASS,
     MENU_EVENT_CLOSE,
     MENU_EVENT_CLOSED,
+    MENU_EVENT_COUNTING_ZONE_EDIT,
+    MENU_EVENT_COUNTING_ZONE_ENABLED,
     MENU_EVENT_POSE,
     MENU_EVENT_SAHI,
     MENU_EVENT_TRACKING,
@@ -34,6 +36,8 @@ def start_class_menu_window(class_names: list[str], selected_class_names: set[st
             menu_state.tracking_enabled,
             menu_state.segmentation_enabled,
             menu_state.display_threshold,
+            menu_state.counting_zone_enabled,
+            menu_state.counting_zone_edit_enabled,
             menu_state.event_queue,
             menu_state.command_queue,
         ),
@@ -86,6 +90,12 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
             elif event_name == MENU_EVENT_THRESHOLD:
                 menu_state.display_threshold = float(payload)
                 menu_state.threshold_changed = True
+            elif event_name == MENU_EVENT_COUNTING_ZONE_ENABLED:
+                menu_state.counting_zone_enabled = bool(payload)
+                menu_state.counting_zone_toggled = True
+            elif event_name == MENU_EVENT_COUNTING_ZONE_EDIT:
+                menu_state.counting_zone_edit_enabled = bool(payload)
+                menu_state.counting_zone_edit_toggled = True
             elif event_name == MENU_EVENT_CLOSED:
                 menu_state.is_open = False
     except queue_module.Empty:
@@ -103,6 +113,8 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
         tracking_toggled=menu_state.tracking_toggled,
         segmentation_toggled=menu_state.segmentation_toggled,
         threshold_changed=menu_state.threshold_changed,
+        counting_zone_toggled=menu_state.counting_zone_toggled,
+        counting_zone_edit_toggled=menu_state.counting_zone_edit_toggled,
     )
     menu_state.class_selection_changed = False
     menu_state.pose_toggled = False
@@ -110,6 +122,8 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
     menu_state.tracking_toggled = False
     menu_state.segmentation_toggled = False
     menu_state.threshold_changed = False
+    menu_state.counting_zone_toggled = False
+    menu_state.counting_zone_edit_toggled = False
     return changes
 
 
@@ -122,6 +136,8 @@ def snapshot_menu_state(menu_state: MenuState, selected_class_names: set[str]) -
         tracking_enabled=menu_state.tracking_enabled,
         segmentation_enabled=menu_state.segmentation_enabled,
         display_threshold=menu_state.display_threshold,
+        counting_zone_enabled=menu_state.counting_zone_enabled,
+        counting_zone_edit_enabled=menu_state.counting_zone_edit_enabled,
     )
 
 
@@ -157,5 +173,13 @@ def handle_class_menu_key(
     if key == ord("g"):
         menu_state.segmentation_enabled = not menu_state.segmentation_enabled
         return MenuChanges(segmentation_toggled=True)
+
+    if key == ord("z"):
+        menu_state.counting_zone_enabled = not menu_state.counting_zone_enabled
+        return MenuChanges(counting_zone_toggled=True)
+
+    if key == ord("e"):
+        menu_state.counting_zone_edit_enabled = not menu_state.counting_zone_edit_enabled
+        return MenuChanges(counting_zone_edit_toggled=True)
 
     return MenuChanges()

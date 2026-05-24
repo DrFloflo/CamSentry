@@ -7,6 +7,8 @@ from worldcam.menu.constants import (
     MENU_EVENT_CLASS,
     MENU_EVENT_CLOSE,
     MENU_EVENT_CLOSED,
+    MENU_EVENT_COUNTING_ZONE_EDIT,
+    MENU_EVENT_COUNTING_ZONE_ENABLED,
     MENU_EVENT_POSE,
     MENU_EVENT_SAHI,
     MENU_EVENT_TRACKING,
@@ -25,6 +27,8 @@ def run_class_menu_process(
     tracking_enabled: bool,
     segmentation_enabled: bool,
     display_threshold: float,
+    counting_zone_enabled: bool,
+    counting_zone_edit_enabled: bool,
     event_queue: mp.Queue,
     command_queue: mp.Queue,
 ) -> None:
@@ -58,6 +62,8 @@ def run_class_menu_process(
     segmentation_var = tk.BooleanVar(value=segmentation_enabled)
     threshold_var = tk.DoubleVar(value=display_threshold)
     threshold_label_var = tk.StringVar(value=f"Threshold: {display_threshold:.2f}")
+    counting_zone_var = tk.BooleanVar(value=counting_zone_enabled)
+    counting_zone_edit_var = tk.BooleanVar(value=counting_zone_edit_enabled)
 
     def toggle_pose() -> None:
         event_queue.put((MENU_EVENT_POSE, bool(pose_var.get())))
@@ -76,10 +82,33 @@ def run_class_menu_process(
         threshold_label_var.set(f"Threshold: {threshold:.2f}")
         event_queue.put((MENU_EVENT_THRESHOLD, threshold))
 
+    def toggle_counting_zone() -> None:
+        event_queue.put((MENU_EVENT_COUNTING_ZONE_ENABLED, bool(counting_zone_var.get())))
+
+    def toggle_counting_zone_edit() -> None:
+        event_queue.put((MENU_EVENT_COUNTING_ZONE_EDIT, bool(counting_zone_edit_var.get())))
+
     ttk.Checkbutton(top_frame, text="Pose", variable=pose_var, command=toggle_pose, style="WorldCam.TCheckbutton").pack(side="left")
     ttk.Checkbutton(top_frame, text="SAHI", variable=sahi_var, command=toggle_sahi, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
     ttk.Checkbutton(top_frame, text="Tracking", variable=tracking_var, command=toggle_tracking, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
     ttk.Checkbutton(top_frame, text="Seg", variable=segmentation_var, command=toggle_segmentation, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
+
+    counting_zone_frame = ttk.LabelFrame(root, text="Zone de comptage")
+    counting_zone_frame.pack(fill="x", padx=10, pady=(0, 8))
+    ttk.Checkbutton(
+        counting_zone_frame,
+        text="Afficher la zone",
+        variable=counting_zone_var,
+        command=toggle_counting_zone,
+        style="WorldCam.TCheckbutton",
+    ).pack(side="left", padx=(8, 0), pady=6)
+    ttk.Checkbutton(
+        counting_zone_frame,
+        text="Mode edition",
+        variable=counting_zone_edit_var,
+        command=toggle_counting_zone_edit,
+        style="WorldCam.TCheckbutton",
+    ).pack(side="left", padx=(24, 0), pady=6)
 
     threshold_frame = ttk.Frame(root)
     threshold_frame.pack(fill="x", padx=10, pady=(0, 8))
@@ -196,6 +225,14 @@ def run_class_menu_process(
         if key == "g":
             segmentation_var.set(not segmentation_var.get())
             toggle_segmentation()
+            return "break"
+        if key == "z":
+            counting_zone_var.set(not counting_zone_var.get())
+            toggle_counting_zone()
+            return "break"
+        if key == "e":
+            counting_zone_edit_var.set(not counting_zone_edit_var.get())
+            toggle_counting_zone_edit()
             return "break"
         if key == "space":
             if 0 <= current_index < len(class_vars):

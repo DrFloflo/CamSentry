@@ -13,6 +13,7 @@ from worldcam.config import (
     PERSON_TRACK_MIN_IOU,
     PERSON_TRACK_TRAIL_LENGTH,
 )
+from worldcam.counting_zone import ZonePoints, point_inside_zone
 from worldcam.detection import Detection, get_detection_color
 
 VEHICLE_COUNT_CLASSES = {"car", "truck"}
@@ -72,10 +73,13 @@ class VehicleCounter:
                 kept_memory.append(counted_vehicle)
         self.counted_memory = kept_memory
 
-    def update_counts(self, tracks: list[ObjectTrack]) -> None:
-        """Count confirmed vehicle tracks once, with duplicate suppression."""
+    def update_counts(self, tracks: list[ObjectTrack], counting_zone_points: ZonePoints | None = None, counting_zone_enabled: bool = False) -> None:
+        """Count confirmed vehicle tracks once, optionally only when their center is inside the counting zone."""
+        zone_points = counting_zone_points or []
         for track in tracks:
             if track.counted or track.class_name not in self.counts or track.hits < VEHICLE_COUNT_MIN_HITS:
+                continue
+            if counting_zone_enabled and not point_inside_zone(track.center, zone_points):
                 continue
             if self.is_recently_counted(track.class_name, track.bbox):
                 track.counted = True
@@ -168,7 +172,12 @@ class ObjectTracker:
         self.next_track_id = 1
         self.vehicle_counter.reset_memory()
 
-    def update(self, detections: list[Detection]) -> list[ObjectTrack]:
+    def update(
+        self,
+        detections: list[Detection],
+        counting_zone_points: ZonePoints | None = None,
+        counting_zone_enabled: bool = False,
+    ) -> list[ObjectTrack]:
         """Update tracks from the latest selected detections and return active tracks."""
         self.vehicle_counter.age_counted_memory()
         object_boxes = [
@@ -229,7 +238,7 @@ class ObjectTracker:
                 del self.tracks[track_id]
 
         active_tracks = self.active_tracks()
-        self.vehicle_counter.update_counts(active_tracks)
+        self.vehicle_counter.update_counts(active_tracks, counting_zone_points, counting_zone_enabled)
         self.vehicle_counter.refresh_counted_memory(active_tracks)
 
         if PERSON_TRACK_DEBUG:

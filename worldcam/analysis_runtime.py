@@ -2,6 +2,7 @@
 
 from ultralytics import YOLO
 
+from worldcam.counting_zone import ZonePoints
 from worldcam.detection import Detection, deduplicate_detections, run_sahi_analysis, run_yolo_analysis
 from worldcam.models import load_pose_model, load_segmentation_model
 from worldcam.pose import Pose, run_pose_analysis
@@ -79,6 +80,8 @@ def update_runtime_analysis(
     sahi_enabled: bool,
     tracking_enabled: bool,
     object_tracker: ObjectTracker,
+    counting_zone_points: ZonePoints | None = None,
+    counting_zone_enabled: bool = False,
 ) -> tuple[YOLO | None, YOLO | None]:
     """Run enabled analyses and refresh runtime result caches."""
     (
@@ -105,7 +108,7 @@ def update_runtime_analysis(
     runtime.latest_detections = deduplicate_detections(runtime.latest_detections)
 
     if tracking_enabled:
-        runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections)
+        runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections, counting_zone_points, counting_zone_enabled)
     else:
         runtime.latest_object_tracks = []
         object_tracker.reset()

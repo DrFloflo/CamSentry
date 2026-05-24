@@ -7,6 +7,7 @@ from ultralytics import YOLO
 
 from worldcam.analysis_runtime import update_runtime_analysis
 from worldcam.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
+from worldcam.counting_zone import CountingZoneEditor
 from worldcam.display_runtime import cleanup_resources, draw_overlay, throttle_display
 from worldcam.models import load_yolo_model
 from worldcam.runtime import (
@@ -91,7 +92,9 @@ def main() -> None:
     object_tracker = ObjectTracker()
     class_names, selected_class_names = build_class_selection(model)
     menu_state = MenuState()
+    counting_zone_editor = CountingZoneEditor()
     cv2.namedWindow(MAIN_WINDOW_NAME)
+    cv2.setMouseCallback(MAIN_WINDOW_NAME, counting_zone_editor.mouse_callback)
 
     try:
         while True:
@@ -131,7 +134,10 @@ def main() -> None:
 
             register_frame_received(runtime, read_duration, reader_stats.latest_frame_age_seconds)
 
+            counting_zone_editor.update_frame_size(frame)
             menu_snapshot = snapshot_menu_state(menu_state, selected_class_names)
+            counting_zone_editor.set_enabled(menu_snapshot.counting_zone_enabled)
+            counting_zone_editor.set_edit_enabled(menu_snapshot.counting_zone_edit_enabled)
             if runtime.frame_count % FRAME_SKIP == 0:
                 pose_model, segmentation_model = update_runtime_analysis(
                     runtime,
@@ -146,6 +152,8 @@ def main() -> None:
                     menu_snapshot.sahi_enabled,
                     menu_snapshot.tracking_enabled,
                     object_tracker,
+                    counting_zone_editor.points,
+                    menu_snapshot.counting_zone_enabled,
                 )
 
             draw_overlay(
@@ -160,6 +168,9 @@ def main() -> None:
                 stream_total,
                 object_tracker.vehicle_counts,
                 menu_snapshot.tracking_enabled,
+                counting_zone_editor.points,
+                menu_snapshot.counting_zone_enabled,
+                menu_snapshot.counting_zone_edit_enabled,
             )
             runtime.next_frame_at = throttle_display(runtime.next_frame_at)
             cv2.imshow(MAIN_WINDOW_NAME, frame)
