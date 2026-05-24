@@ -312,7 +312,7 @@ def draw_vehicle_counts(frame: np.ndarray, vehicle_counts: dict[str, int]) -> No
     thickness = 2
     margin = 12
     line_height = 26
-    labels = [f"Vehicles: {vehicle_counts.get(VEHICLE_COUNT_KEY, 0)}"]
+    labels = [f"Nb de véhicules aujourd'hui: {vehicle_counts.get(VEHICLE_COUNT_KEY, 0)}"]
     y = max(margin + line_height, frame.shape[0] - margin - line_height * (len(labels) - 1))
 
     for label in labels:
