@@ -1,5 +1,6 @@
 """Application orchestration for the WorldCam video analysis loop."""
 
+import argparse
 import time
 
 import cv2
@@ -22,6 +23,7 @@ from worldcam.streaming import configure_ffmpeg_http_headers, print_videoio_diag
 from worldcam.stream_control import open_stream_resources, reconnect_current_stream, switch_stream
 from worldcam.tracking import ObjectTracker
 from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
+from worldcam.web_stream import WebStreamServer, start_web_stream_server
 
 KEY_LEFT_VALUES = {81, 2424832}
 KEY_RIGHT_VALUES = {83, 2555904}
@@ -67,8 +69,31 @@ def handle_menu_changes(
         runtime.latest_poses = []
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse WorldCam command-line options."""
+    parser = argparse.ArgumentParser(description="Run the WorldCam analysis application.")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Disable OpenCV windows and publish the annotated stream over HTTP.",
+    )
+    parser.add_argument(
+        "--stream-host",
+        default="0.0.0.0",
+        help="Host/IP address used by the headless HTTP stream server.",
+    )
+    parser.add_argument(
+        "--stream-port",
+        type=int,
+        default=8080,
+        help="TCP port used by the headless HTTP stream server.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
     """Run the WorldCam analysis application."""
+    args = parse_args(argv)
     configure_ffmpeg_http_headers()
     if not STREAM_URLS:
         print("Erreur : aucun stream configuré dans STREAM_URLS.")
@@ -93,8 +118,13 @@ def main() -> None:
     class_names, selected_class_names = build_class_selection(model)
     menu_state = MenuState()
     counting_zone_editor = CountingZoneEditor()
-    cv2.namedWindow(MAIN_WINDOW_NAME)
-    cv2.setMouseCallback(MAIN_WINDOW_NAME, counting_zone_editor.mouse_callback)
+    web_stream_server: WebStreamServer | None = None
+
+    if args.headless:
+        web_stream_server = start_web_stream_server(args.stream_host, args.stream_port)
+    else:
+        cv2.namedWindow(MAIN_WINDOW_NAME)
+        cv2.setMouseCallback(MAIN_WINDOW_NAME, counting_zone_editor.mouse_callback)
 
     try:
         while True:
@@ -171,12 +201,16 @@ def main() -> None:
                 menu_snapshot.counting_zone_enabled,
                 menu_snapshot.counting_zone_edit_enabled,
             )
-            runtime.next_frame_at = throttle_display(runtime.next_frame_at)
-            cv2.imshow(MAIN_WINDOW_NAME, frame)
+            if web_stream_server is not None:
+                web_stream_server.update_frame(frame)
 
-            key = cv2.waitKeyEx(1)
-            if key == ord("q"):
-                break
+            runtime.next_frame_at = throttle_display(runtime.next_frame_at)
+            key = -1
+            if not args.headless:
+                cv2.imshow(MAIN_WINDOW_NAME, frame)
+                key = cv2.waitKeyEx(1)
+                if key == ord("q"):
+                    break
             if key in KEY_LEFT_VALUES or key in KEY_RIGHT_VALUES:
                 step = -1 if key in KEY_LEFT_VALUES else 1
                 resources, stream_index = switch_stream(resources, stream_index, step, stream_total)
@@ -191,7 +225,11 @@ def main() -> None:
                 runtime,
                 object_tracker,
             )
+    except KeyboardInterrupt:
+        print("Arrêt demandé par l'utilisateur.")
     finally:
+        if web_stream_server is not None:
+            web_stream_server.stop()
         close_class_menu_window(menu_state)
         resources.stream_reader.stop()
         cleanup_resources(resources.cap, resources.ffmpeg_process, model, pose_model, segmentation_model, device)
