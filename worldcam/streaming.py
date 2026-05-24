@@ -1,5 +1,6 @@
 """Video stream setup and frame reading utilities."""
 
+from dataclasses import dataclass
 import os
 import shutil
 import subprocess
@@ -11,12 +12,22 @@ import cv2
 import numpy as np
 
 from worldcam.config import (
+    FFMPEG_ANALYZEDURATION_US,
     FFMPEG_HEADERS,
+    FFMPEG_HWACCEL,
+    FFMPEG_INPUT_REALTIME,
+    FFMPEG_MAX_DELAY_US,
+    FFMPEG_PROBESIZE,
+    FFMPEG_RECONNECT_DELAY_MAX_SECONDS,
+    FFMPEG_REPEAT_DELTA_THRESHOLD,
+    FFMPEG_REPEAT_SAMPLE_SIZE,
+    FFMPEG_THREAD_QUEUE_SIZE,
     FRAME_SIZE,
     ORIGIN,
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
     REFERER,
+    STREAM_STALE_SECONDS,
     TARGET_FPS,
     USER_AGENT,
 )
@@ -63,35 +74,63 @@ def open_with_opencv(url: str) -> cv2.VideoCapture | None:
     return None
 
 
-def start_ffmpeg_pipe(url: str) -> subprocess.Popen:
-    """Start external ffmpeg and pipe decoded BGR frames to Python/OpenCV."""
-    ffmpeg_path = shutil.which("ffmpeg")
-    if ffmpeg_path is None:
-        raise RuntimeError("ffmpeg.exe est requis pour ce fallback, mais il est introuvable dans le PATH.")
-
+def build_ffmpeg_command(ffmpeg_path: str, url: str) -> list[str]:
+    """Build the low-latency FFmpeg command used by the external rawvideo pipe."""
     command = [
         ffmpeg_path,
         "-hide_banner",
         "-loglevel",
         "error",
+        "-nostdin",
         "-fflags",
-        "nobuffer",
+        "nobuffer+discardcorrupt",
         "-flags",
         "low_delay",
-        "-re",
-        "-headers",
-        FFMPEG_HEADERS,
-        "-i",
-        url,
-        "-an",
-        "-vf",
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},fps={TARGET_FPS}",
-        "-pix_fmt",
-        "bgr24",
-        "-f",
-        "rawvideo",
-        "pipe:1",
+        "-max_delay",
+        str(FFMPEG_MAX_DELAY_US),
+        "-probesize",
+        str(FFMPEG_PROBESIZE),
+        "-analyzeduration",
+        str(FFMPEG_ANALYZEDURATION_US),
+        "-reconnect",
+        "1",
+        "-reconnect_streamed",
+        "1",
+        "-reconnect_delay_max",
+        str(FFMPEG_RECONNECT_DELAY_MAX_SECONDS),
+        "-thread_queue_size",
+        str(FFMPEG_THREAD_QUEUE_SIZE),
     ]
+    if FFMPEG_HWACCEL:
+        command.extend(["-hwaccel", FFMPEG_HWACCEL])
+    if FFMPEG_INPUT_REALTIME:
+        command.append("-re")
+    command.extend(
+        [
+            "-headers",
+            FFMPEG_HEADERS,
+            "-i",
+            url,
+            "-an",
+            "-vf",
+            f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:flags=bicubic",
+            "-pix_fmt",
+            "bgr24",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]
+    )
+    return command
+
+
+def start_ffmpeg_pipe(url: str) -> subprocess.Popen:
+    """Start external FFmpeg and pipe fresh decoded BGR frames to Python/OpenCV."""
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        raise RuntimeError("ffmpeg.exe est requis pour ce fallback, mais il est introuvable dans le PATH.")
+
+    command = build_ffmpeg_command(ffmpeg_path, url)
     return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
@@ -122,6 +161,18 @@ def read_stream_frame(
     return read_ffmpeg_frame(ffmpeg_process)
 
 
+@dataclass(frozen=True)
+class StreamReaderStats:
+    """Snapshot of buffered stream freshness and continuity counters."""
+
+    frames_read: int
+    frames_replaced: int
+    repeated_frames: int
+    consecutive_failures: int
+    latest_frame_age_seconds: float | None
+    stale: bool
+
+
 class BufferedStreamReader:
     """Read stream frames in a background thread and expose only the latest frame."""
 
@@ -136,8 +187,10 @@ class BufferedStreamReader:
         self.last_returned_frame_id = 0
         self.frames_read = 0
         self.frames_replaced = 0
+        self.repeated_frames = 0
         self.consecutive_failures = 0
         self.last_frame_at = 0.0
+        self.previous_sample: np.ndarray | None = None
 
     def start(self) -> None:
         """Start the background stream reader."""
@@ -168,6 +221,8 @@ class BufferedStreamReader:
                 continue
 
             now = time.perf_counter()
+            if self.is_repeated_content(frame):
+                self.repeated_frames += 1
             with self.condition:
                 if self.latest_frame_id > self.last_returned_frame_id:
                     self.frames_replaced += 1
@@ -193,3 +248,38 @@ class BufferedStreamReader:
 
             self.last_returned_frame_id = self.latest_frame_id
             return True, self.latest_frame
+
+    def is_repeated_content(self, frame: np.ndarray) -> bool:
+        """Return whether the frame content is nearly identical to the previous sample."""
+        sample_width, sample_height = FFMPEG_REPEAT_SAMPLE_SIZE
+        sample = cv2.resize(frame, (sample_width, sample_height), interpolation=cv2.INTER_AREA)
+        if self.previous_sample is None:
+            self.previous_sample = sample
+            return False
+        mean_delta = float(np.mean(cv2.absdiff(self.previous_sample, sample)))
+        self.previous_sample = sample
+        return mean_delta < FFMPEG_REPEAT_DELTA_THRESHOLD
+
+    def latest_frame_age_seconds(self) -> float | None:
+        """Return the age of the newest decoded frame, or None before the first frame."""
+        if self.last_frame_at <= 0.0:
+            return None
+        return max(0.0, time.perf_counter() - self.last_frame_at)
+
+    def is_stale(self) -> bool:
+        """Return whether no fresh decoded frame has arrived within the configured stale window."""
+        age = self.latest_frame_age_seconds()
+        return age is None or age > STREAM_STALE_SECONDS
+
+    def stats(self) -> StreamReaderStats:
+        """Return a thread-safe snapshot of reader counters and frame freshness."""
+        with self.condition:
+            age = self.latest_frame_age_seconds()
+            return StreamReaderStats(
+                frames_read=self.frames_read,
+                frames_replaced=self.frames_replaced,
+                repeated_frames=self.repeated_frames,
+                consecutive_failures=self.consecutive_failures,
+                latest_frame_age_seconds=age,
+                stale=age is None or age > STREAM_STALE_SECONDS,
+            )

@@ -9,7 +9,7 @@ import time
 import cv2
 import numpy as np
 
-from worldcam.config import TARGET_FPS
+from worldcam.config import FFMPEG_REPEAT_DELTA_THRESHOLD
 from worldcam.tests.stream_analysis_ffmpeg import read_profile_frame, start_analysis_ffmpeg_pipe, stop_ffmpeg_process
 from worldcam.tests.stream_analysis_types import StreamAnalysis
 
@@ -109,6 +109,8 @@ def collect_frames(
     read_failures = 0
     frames_read = 0
     frozen_transitions = 0
+    frame_deltas: list[float] = []
+    repeated_delta_threshold = min(FFMPEG_REPEAT_DELTA_THRESHOLD, 0.25)
     previous_small_frame: np.ndarray | None = None
     started_at = time.perf_counter()
     deadline = started_at + duration_seconds
@@ -138,7 +140,8 @@ def collect_frames(
         small_frame = cv2.resize(frame, (64, 36), interpolation=cv2.INTER_AREA)
         if previous_small_frame is not None:
             mean_delta = float(np.mean(cv2.absdiff(previous_small_frame, small_frame)))
-            if mean_delta < 1.0:
+            frame_deltas.append(mean_delta)
+            if mean_delta < repeated_delta_threshold:
                 frozen_transitions += 1
         previous_small_frame = small_frame
 
@@ -164,6 +167,7 @@ def collect_frames(
         "read_failures": read_failures,
         "frames_read": frames_read,
         "frozen_transitions": frozen_transitions,
+        "frame_deltas": frame_deltas,
     }
 
 
@@ -187,6 +191,7 @@ def build_analysis_result(
     contrast_values = measurements["contrast_values"]
     sharpness_values = measurements["sharpness_values"]
     frozen_transitions = int(measurements["frozen_transitions"])
+    frame_deltas = measurements["frame_deltas"]
 
     decoded_fps = frames_read / sampled_seconds if sampled_seconds > 0 else 0.0
     fps_vs_target_ratio = decoded_fps / target_fps if target_fps > 0 else None
@@ -194,8 +199,10 @@ def build_analysis_result(
     average_interval = statistics.fmean(frame_intervals) if frame_intervals else None
     jitter = statistics.pstdev(frame_intervals) if len(frame_intervals) >= 2 else None
     frozen_frame_ratio = frozen_transitions / max(1, frames_read - 1) if frames_read >= 2 else None
+    low_motion_sample = bool(frame_deltas and statistics.median(frame_deltas) < FFMPEG_REPEAT_DELTA_THRESHOLD)
+    score_frozen_frame_ratio = 0.0 if low_motion_sample else frozen_frame_ratio
     bytes_per_second = (frames_read * width * height * 3) / sampled_seconds if sampled_seconds > 0 else 0.0
-    expected_frames = sampled_seconds * target_fps
+    expected_frames = sampled_seconds * target_fps if target_fps > 0 else frames_read
     notes = ["Analyzed via external ffmpeg.exe rawvideo fallback, without trying OpenCV VideoCapture."]
 
     if frames_read == 0:
@@ -203,7 +210,9 @@ def build_analysis_result(
     if fps_vs_target_ratio is not None and fps_vs_target_ratio < 0.75:
         notes.append("Decoded FPS is below 75% of the tested profile FPS.")
     if frozen_frame_ratio is not None and frozen_frame_ratio > 0.05:
-        notes.append("Possible frozen/repeated frames detected.")
+        notes.append("Near-identical repeated frames detected.")
+    if low_motion_sample:
+        notes.append("Very low scene motion during the sample; repeated-frame ratio is reported but not used as a stability penalty.")
     if jitter is not None and jitter > 0.1:
         notes.append("Frame interval jitter is high.")
 
@@ -217,14 +226,14 @@ def build_analysis_result(
         read_failures=read_failures,
         width=width,
         height=height,
-        capture_fps_hint=round(float(target_fps), 3),
+        capture_fps_hint=round(float(target_fps), 3) if target_fps > 0 else None,
         decoded_fps=round(decoded_fps, 3),
         fps_vs_target_ratio=round(fps_vs_target_ratio, 3) if fps_vs_target_ratio is not None else None,
         average_read_latency_ms=round(statistics.fmean(read_latencies) * 1000.0, 3) if read_latencies else None,
         p95_read_latency_ms=round(percentile(read_latencies, 0.95) * 1000.0, 3) if read_latencies else None,
         average_frame_interval_ms=round(average_interval * 1000.0, 3) if average_interval is not None else None,
         frame_interval_jitter_ms=round(jitter * 1000.0, 3) if jitter is not None else None,
-        stability_score=calculate_stability_score(frames_read, read_failures, expected_frames, (jitter or 0.0) * 1000.0, frozen_frame_ratio),
+        stability_score=calculate_stability_score(frames_read, read_failures, expected_frames, (jitter or 0.0) * 1000.0, score_frozen_frame_ratio),
         estimated_decoded_mbps=round((bytes_per_second * 8.0) / 1_000_000.0, 3),
         average_brightness=round(statistics.fmean(brightness_values), 3) if brightness_values else None,
         average_contrast=round(statistics.fmean(contrast_values), 3) if contrast_values else None,

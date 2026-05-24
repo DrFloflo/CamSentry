@@ -6,7 +6,7 @@ import cv2
 from ultralytics import YOLO
 
 from worldcam.analysis_runtime import update_runtime_analysis
-from worldcam.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, STREAM_URLS
+from worldcam.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
 from worldcam.display_runtime import cleanup_resources, draw_overlay, throttle_display
 from worldcam.models import load_yolo_model
 from worldcam.runtime import (
@@ -25,8 +25,6 @@ from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes
 KEY_LEFT_VALUES = {81, 2424832}
 KEY_RIGHT_VALUES = {83, 2555904}
 MAIN_WINDOW_NAME = "Analyse Image - Earth cam"
-STREAM_READ_TIMEOUT = 1.0
-MAX_STREAM_READ_FAILURES = 5
 
 
 def build_class_selection(model: YOLO) -> tuple[list[str], set[str]]:
@@ -98,8 +96,9 @@ def main() -> None:
     try:
         while True:
             read_started_at = time.perf_counter()
-            ret, frame = resources.stream_reader.read(timeout=STREAM_READ_TIMEOUT)
+            ret, frame = resources.stream_reader.read(timeout=STREAM_READ_TIMEOUT_SECONDS)
             read_duration = time.perf_counter() - read_started_at
+            reader_stats = resources.stream_reader.stats()
             register_stream_read(runtime, read_duration)
 
             if not ret:
@@ -116,7 +115,21 @@ def main() -> None:
                     print(f"Erreur pendant la reconnexion automatique : {exc}")
                     break
 
-            register_frame_received(runtime, read_duration)
+            if reader_stats.stale:
+                if not register_stream_read_failure(runtime, MAX_STREAM_READ_FAILURES):
+                    continue
+
+                print("Flux obsolète: reconnexion automatique...")
+                try:
+                    resources = reconnect_current_stream(resources, stream_index, stream_total)
+                    runtime.stream_read_failures = 0
+                    reset_analysis_state(runtime, object_tracker)
+                    continue
+                except RuntimeError as exc:
+                    print(f"Erreur pendant la reconnexion automatique : {exc}")
+                    break
+
+            register_frame_received(runtime, read_duration, reader_stats.latest_frame_age_seconds)
 
             menu_snapshot = snapshot_menu_state(menu_state, selected_class_names)
             if runtime.frame_count % FRAME_SKIP == 0:

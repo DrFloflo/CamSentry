@@ -7,7 +7,16 @@ import subprocess
 
 import numpy as np
 
-from worldcam.config import FFMPEG_HEADERS
+from worldcam.config import (
+    FFMPEG_ANALYZEDURATION_US,
+    FFMPEG_HEADERS,
+    FFMPEG_HWACCEL,
+    FFMPEG_INPUT_REALTIME,
+    FFMPEG_MAX_DELAY_US,
+    FFMPEG_PROBESIZE,
+    FFMPEG_RECONNECT_DELAY_MAX_SECONDS,
+    FFMPEG_THREAD_QUEUE_SIZE,
+)
 
 
 def start_analysis_ffmpeg_pipe(url: str, width: int, height: int, fps: int) -> subprocess.Popen:
@@ -17,29 +26,55 @@ def start_analysis_ffmpeg_pipe(url: str, width: int, height: int, fps: int) -> s
     if ffmpeg_path is None:
         raise RuntimeError("ffmpeg.exe is required but was not found in PATH.")
 
+    video_filter = f"scale={width}:{height}:flags=bicubic"
+    if fps > 0:
+        video_filter = f"{video_filter},fps={fps}"
+
     command = [
         ffmpeg_path,
         "-hide_banner",
         "-loglevel",
         "error",
+        "-nostdin",
         "-fflags",
-        "nobuffer",
+        "nobuffer+discardcorrupt",
         "-flags",
         "low_delay",
-        "-re",
-        "-headers",
-        FFMPEG_HEADERS,
-        "-i",
-        url,
-        "-an",
-        "-vf",
-        f"scale={width}:{height},fps={fps}",
-        "-pix_fmt",
-        "bgr24",
-        "-f",
-        "rawvideo",
-        "pipe:1",
+        "-max_delay",
+        str(FFMPEG_MAX_DELAY_US),
+        "-probesize",
+        str(FFMPEG_PROBESIZE),
+        "-analyzeduration",
+        str(FFMPEG_ANALYZEDURATION_US),
+        "-reconnect",
+        "1",
+        "-reconnect_streamed",
+        "1",
+        "-reconnect_delay_max",
+        str(FFMPEG_RECONNECT_DELAY_MAX_SECONDS),
+        "-thread_queue_size",
+        str(FFMPEG_THREAD_QUEUE_SIZE),
     ]
+    if FFMPEG_HWACCEL:
+        command.extend(["-hwaccel", FFMPEG_HWACCEL])
+    if FFMPEG_INPUT_REALTIME:
+        command.append("-re")
+    command.extend(
+        [
+            "-headers",
+            FFMPEG_HEADERS,
+            "-i",
+            url,
+            "-an",
+            "-vf",
+            video_filter,
+            "-pix_fmt",
+            "bgr24",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]
+    )
     return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 

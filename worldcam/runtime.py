@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 import time
 
-from worldcam.config import READ_WARN_SECONDS, STATS_LOG_SECONDS
+from worldcam.config import READ_WARN_SECONDS, STATS_LOG_SECONDS, STREAM_STALE_SECONDS
 from worldcam.detection import Detection
 from worldcam.pose import Pose
 from worldcam.segmentation import SegmentationMask
@@ -20,6 +20,7 @@ class RuntimeState:
     latest_object_tracks: list[ObjectTrack] = field(default_factory=list)
     frame_count: int = 0
     slow_reads: int = 0
+    stale_reads: int = 0
     stream_read_failures: int = 0
     started_at: float = field(default_factory=time.perf_counter)
     last_stats_at: float = field(default_factory=time.perf_counter)
@@ -42,6 +43,7 @@ def reset_stream_statistics(runtime: RuntimeState) -> None:
     now = time.perf_counter()
     runtime.frame_count = 0
     runtime.slow_reads = 0
+    runtime.stale_reads = 0
     runtime.stream_read_failures = 0
     runtime.started_at = now
     runtime.last_stats_at = now
@@ -64,8 +66,8 @@ def register_stream_read_failure(runtime: RuntimeState, max_failures: int) -> bo
     return runtime.stream_read_failures >= max_failures
 
 
-def register_frame_received(runtime: RuntimeState, read_duration: float) -> None:
-    """Update frame counters, FPS, and periodic stream statistics."""
+def register_frame_received(runtime: RuntimeState, read_duration: float, frame_age: float | None = None) -> None:
+    """Update fresh-frame counters, FPS, and periodic stream statistics."""
     runtime.stream_read_failures = 0
     runtime.frame_count += 1
     now = time.perf_counter()
@@ -74,11 +76,16 @@ def register_frame_received(runtime: RuntimeState, read_duration: float) -> None
         runtime.current_fps = 1.0 / frame_delta
     runtime.last_frame_at = now
 
+    if frame_age is not None and frame_age > STREAM_STALE_SECONDS:
+        runtime.stale_reads += 1
+
     if now - runtime.last_stats_at >= STATS_LOG_SECONDS:
         elapsed = now - runtime.started_at
         average_fps = runtime.frame_count / elapsed if elapsed > 0 else 0.0
+        age_text = "n/a" if frame_age is None else f"{frame_age:.3f}s"
         print(
             f"Stats flux: frames={runtime.frame_count}, fps_moyen={average_fps:.1f}, "
-            f"lectures_lentes={runtime.slow_reads}, derniere_lecture={read_duration:.3f}s"
+            f"lectures_lentes={runtime.slow_reads}, lectures_obsoletes={runtime.stale_reads}, "
+            f"derniere_lecture={read_duration:.3f}s, age_frame={age_text}"
         )
         runtime.last_stats_at = now

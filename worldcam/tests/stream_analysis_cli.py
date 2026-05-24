@@ -20,8 +20,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--progress-interval", type=float, default=2.0, help="Seconds between progress logs during sampling.")
     parser.add_argument(
         "--profiles",
-        default=f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@{TARGET_FPS},1280x720@10,960x540@15,640x360@15",
-        help="Comma-separated decode profiles as WIDTHxHEIGHT@FPS.",
+        default=f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@15,{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@{TARGET_FPS},{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@native",
+        help="Comma-separated decode profiles as WIDTHxHEIGHT@FPS or WIDTHxHEIGHT@native.",
     )
     return parser.parse_args()
 
@@ -39,12 +39,13 @@ def parse_profiles(profile_text: str) -> list[tuple[str, int, int, int]]:
             width_text, height_text = size_text.split("x", 1)
             width = int(width_text)
             height = int(height_text)
-            fps = int(fps_text)
+            fps = 0 if fps_text == "native" else int(fps_text)
         except ValueError as exc:
-            raise ValueError(f"Invalid profile '{raw_profile}'. Expected WIDTHxHEIGHT@FPS.") from exc
-        if width <= 0 or height <= 0 or fps <= 0:
-            raise ValueError(f"Invalid profile '{raw_profile}'. Width, height and FPS must be positive.")
-        profiles.append((f"{width}x{height}@{fps}", width, height, fps))
+            raise ValueError(f"Invalid profile '{raw_profile}'. Expected WIDTHxHEIGHT@FPS or WIDTHxHEIGHT@native.") from exc
+        if width <= 0 or height <= 0 or fps < 0:
+            raise ValueError(f"Invalid profile '{raw_profile}'. Width and height must be positive; FPS must be positive or native.")
+        profile_fps_text = "native" if fps == 0 else str(fps)
+        profiles.append((f"{width}x{height}@{profile_fps_text}", width, height, fps))
     if not profiles:
         raise ValueError("At least one decode profile is required.")
     return profiles
