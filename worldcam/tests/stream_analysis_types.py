@@ -7,8 +7,35 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class HlsVariant:
+    """One variant advertised by an HLS master playlist."""
+
+    uri: str | None
+    width: int | None
+    height: int | None
+    fps: float | None
+    bandwidth_kbps: float | None
+    codecs: str | None
+
+
+@dataclass(frozen=True)
+class HlsProbe:
+    """Maximum capabilities advertised by the HLS manifest."""
+
+    available: bool
+    is_master_playlist: bool
+    variant_count: int
+    max_width: int | None
+    max_height: int | None
+    max_fps: float | None
+    max_bandwidth_kbps: float | None
+    variants: list[HlsVariant]
+    notes: list[str]
+
+
+@dataclass(frozen=True)
 class SourceProbe:
-    """Metadata reported by ffprobe before decoding the stream."""
+    """Metadata reported by the HLS manifest and ffprobe before decoding the stream."""
 
     available: bool
     codec: str | None
@@ -17,6 +44,7 @@ class SourceProbe:
     fps: float | None
     video_bitrate_kbps: float | None
     format_bitrate_kbps: float | None
+    hls: HlsProbe
     raw: dict[str, Any] | None
     notes: list[str]
 

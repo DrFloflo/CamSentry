@@ -13,7 +13,28 @@ from worldcam.tests.stream_analysis_types import SourceProbe, StreamAnalysis
 def format_source_probe(source_probe: SourceProbe) -> list[str]:
     """Create human-readable source metadata lines."""
 
-    lines = ["  Source metadata:"]
+    lines = ["  HLS advertised maximum:"]
+    hls = source_probe.hls
+    if hls.available and hls.is_master_playlist:
+        lines.append(
+            "    "
+            f"max_resolution={hls.max_width}x{hls.max_height}, max_fps={hls.max_fps}, "
+            f"max_bandwidth_kbps={hls.max_bandwidth_kbps}, variants={hls.variant_count}"
+        )
+        for variant in sorted(hls.variants, key=lambda item: ((item.width or 0) * (item.height or 0), item.bandwidth_kbps or 0.0), reverse=True):
+            lines.append(
+                "    - "
+                f"{variant.width}x{variant.height}, fps={variant.fps}, "
+                f"bandwidth_kbps={variant.bandwidth_kbps}, codecs={variant.codecs}"
+            )
+    elif hls.available:
+        lines.append("    no master-playlist variants advertised")
+    else:
+        lines.append("    unavailable")
+    for note in hls.notes:
+        lines.append(f"    - {note}")
+
+    lines.append("  ffprobe selected stream:")
     if source_probe.available:
         lines.append(
             "    "

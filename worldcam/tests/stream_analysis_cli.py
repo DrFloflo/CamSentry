@@ -16,9 +16,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-frames", type=int, default=0, help="Optional max frames per profile; 0 means no cap.")
     parser.add_argument("--stream-index", type=int, default=-1, help="Analyze only this zero-based stream index; -1 means all.")
     parser.add_argument("--json-output", type=Path, default=None, help="Optional path where the JSON report is written.")
+    parser.add_argument("--quiet", action="store_true", help="Disable progress logs while profiles are being sampled.")
+    parser.add_argument("--progress-interval", type=float, default=2.0, help="Seconds between progress logs during sampling.")
     parser.add_argument(
         "--profiles",
-        default=f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@{TARGET_FPS},1280x720@12,1280x720@10,960x540@15,640x360@15",
+        default=f"{OUTPUT_WIDTH}x{OUTPUT_HEIGHT}@{TARGET_FPS},1280x720@10,960x540@15,640x360@15",
         help="Comma-separated decode profiles as WIDTHxHEIGHT@FPS.",
     )
     return parser.parse_args()

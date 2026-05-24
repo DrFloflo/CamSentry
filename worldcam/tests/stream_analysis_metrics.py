@@ -90,7 +90,15 @@ def failed_stream_analysis(stream_index: int, url: str, profile_name: str, exc: 
     )
 
 
-def collect_frames(process, width: int, height: int, duration_seconds: float, max_frames: int) -> dict[str, object]:
+def collect_frames(
+    process,
+    width: int,
+    height: int,
+    duration_seconds: float,
+    max_frames: int,
+    progress_label: str | None = None,
+    progress_interval: float = 2.0,
+) -> dict[str, object]:
     """Read decoded frames for one profile and collect raw measurements."""
 
     read_latencies: list[float] = []
@@ -104,6 +112,7 @@ def collect_frames(process, width: int, height: int, duration_seconds: float, ma
     previous_small_frame: np.ndarray | None = None
     started_at = time.perf_counter()
     deadline = started_at + duration_seconds
+    next_progress_at = started_at + max(0.5, progress_interval)
 
     while time.perf_counter() < deadline:
         if max_frames > 0 and frames_read >= max_frames:
@@ -132,6 +141,18 @@ def collect_frames(process, width: int, height: int, duration_seconds: float, ma
             if mean_delta < 1.0:
                 frozen_transitions += 1
         previous_small_frame = small_frame
+
+        now = time.perf_counter()
+        if progress_label is not None and now >= next_progress_at:
+            elapsed = max(0.001, now - started_at)
+            current_fps = frames_read / elapsed
+            remaining = max(0.0, deadline - now)
+            print(
+                f"  ... {progress_label}: {elapsed:.1f}/{duration_seconds:.1f}s, "
+                f"frames={frames_read}, fps={current_fps:.2f}, failures={read_failures}, remaining={remaining:.1f}s",
+                flush=True,
+            )
+            next_progress_at = now + max(0.5, progress_interval)
 
     return {
         "sampled_seconds": max(0.0, time.perf_counter() - started_at),
@@ -222,8 +243,14 @@ def analyze_stream(
     target_fps: int,
     duration_seconds: float,
     max_frames: int,
+    verbose: bool = True,
+    progress_interval: float = 2.0,
 ) -> StreamAnalysis:
     """Sample one configured stream through an explicit external FFmpeg decode profile."""
+
+    progress_label = f"stream {stream_index} / profile {profile_name}"
+    if verbose:
+        print(f"Starting {progress_label} for {duration_seconds:.1f}s...", flush=True)
 
     try:
         process = start_analysis_ffmpeg_pipe(url, width, height, target_fps)
@@ -231,8 +258,23 @@ def analyze_stream(
         return failed_stream_analysis(stream_index, url, profile_name, exc)
 
     try:
-        measurements = collect_frames(process, width, height, duration_seconds, max_frames)
+        measurements = collect_frames(
+            process,
+            width,
+            height,
+            duration_seconds,
+            max_frames,
+            progress_label=progress_label if verbose else None,
+            progress_interval=progress_interval,
+        )
     finally:
         stop_ffmpeg_process(process)
 
-    return build_analysis_result(stream_index, url, profile_name, width, height, target_fps, measurements)
+    result = build_analysis_result(stream_index, url, profile_name, width, height, target_fps, measurements)
+    if verbose:
+        print(
+            f"Finished {progress_label}: frames={result.frames_read}, fps={result.decoded_fps}, "
+            f"stability={result.stability_score}/100, sharpness={result.average_sharpness}",
+            flush=True,
+        )
+    return result
