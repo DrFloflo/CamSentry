@@ -13,14 +13,25 @@ from worldcam.pose import Pose, draw_pose_detections
 from worldcam.segmentation import SegmentationMask, draw_segmentation_masks
 from worldcam.stream_control import release_stream_resources
 from worldcam.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
-from worldcam.ui import draw_fps, draw_stream_counter
+from worldcam.ui import draw_stream_counter
 
 ZonePoints = list[tuple[int, int]]
 
+def draw_timestamp(frame: cv2.Mat) -> None:
+    """Draw the current timestamp in the top-left corner."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    thickness = 2
+    margin = 10
+    text_size, _ = cv2.getTextSize(timestamp, font, font_scale, thickness)
+    text_width, text_height = text_size
+    x = margin
+    y = margin + text_height
+    cv2.putText(frame, timestamp, (x, y), font, font_scale, (255, 255, 255), thickness)
 
 def draw_overlay(
     frame,
-    fps: float,
     detections: list[Detection],
     poses: list[Pose],
     segmentations: list[SegmentationMask],
@@ -41,10 +52,10 @@ def draw_overlay(
     else:
         draw_yolo_detections(frame, detections, display_threshold)
     draw_pose_detections(frame, poses)
-    draw_fps(frame, fps)
     draw_stream_counter(frame, stream_index, stream_total)
     draw_vehicle_counts(frame, vehicle_counts)
     draw_counting_zone(frame, counting_zone_points, counting_zone_enabled, counting_zone_edit_enabled)
+    draw_timestamp(frame)
 
 
 def draw_counting_zone(

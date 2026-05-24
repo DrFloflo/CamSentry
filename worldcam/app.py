@@ -158,7 +158,6 @@ def main() -> None:
 
             draw_overlay(
                 frame,
-                runtime.current_fps,
                 runtime.latest_detections,
                 runtime.latest_poses,
                 runtime.latest_segmentations,
