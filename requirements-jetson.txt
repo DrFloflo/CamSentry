@@ -14,4 +14,3 @@ pandas
 scipy
 psutil
 py-cpuinfo
-ultralytics-thop

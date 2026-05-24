@@ -20,9 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-jetson.txt /app/requirements-jetson.txt
-RUN python3 -m pip install --upgrade pip --index-url https://pypi.org/simple && \
+RUN python3 -c "import torch; print('base torch before pip:', torch.__version__)" && \
+    python3 -m pip install --upgrade pip --index-url https://pypi.org/simple && \
     python3 -m pip install --index-url https://pypi.org/simple -r /app/requirements-jetson.txt && \
-    python3 -m pip install --index-url https://pypi.org/simple --no-deps ultralytics
+    python3 -m pip install --index-url https://pypi.org/simple --no-deps ultralytics ultralytics-thop && \
+    python3 -c "import torch; version=torch.__version__; print('torch after pip:', version); raise SystemExit('ERROR: pip replaced Jetson PyTorch with CUDA 13 wheel') if '+cu13' in version else None"
 
 COPY . /app
 
