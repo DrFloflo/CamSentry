@@ -28,7 +28,7 @@ from worldcam.core.runtime import (
     reset_stream_statistics,
 )
 from worldcam.stream.streaming import configure_ffmpeg_http_headers, print_videoio_diagnostics
-from worldcam.stream.stream_control import open_stream_resources, reconnect_current_stream, switch_stream
+from worldcam.stream.stream_control import open_stream_resources_with_retry, reconnect_current_stream, switch_stream
 from worldcam.analysis.tracking import ObjectTracker
 from worldcam.display.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
 from worldcam.stream.web_stream import WebStreamServer, start_web_stream_server
@@ -130,11 +130,7 @@ def main(argv: list[str] | None = None) -> None:
     pose_model = None
     segmentation_model = None
 
-    try:
-        resources = open_stream_resources(STREAM_URLS[stream_index], stream_index, stream_total)
-    except RuntimeError as exc:
-        print(f"Erreur : {exc}")
-        return
+    resources = open_stream_resources_with_retry(STREAM_URLS[stream_index], stream_index, stream_total)
 
     runtime = RuntimeState()
     object_tracker = ObjectTracker()
@@ -161,29 +157,21 @@ def main(argv: list[str] | None = None) -> None:
                 if not register_stream_read_failure(runtime, MAX_STREAM_READ_FAILURES):
                     continue
 
-                print("Reconnexion automatique du flux...")
-                try:
-                    resources = reconnect_current_stream(resources, stream_index, stream_total)
-                    runtime.stream_read_failures = 0
-                    reset_analysis_state(runtime, object_tracker)
-                    continue
-                except RuntimeError as exc:
-                    print(f"Erreur pendant la reconnexion automatique : {exc}")
-                    break
+                print("Reconnexion en cours...")
+                resources = reconnect_current_stream(resources, stream_index, stream_total)
+                runtime.stream_read_failures = 0
+                reset_analysis_state(runtime, object_tracker)
+                continue
 
             if reader_stats.stale:
                 if not register_stream_read_failure(runtime, MAX_STREAM_READ_FAILURES):
                     continue
 
-                print("Flux obsolète: reconnexion automatique...")
-                try:
-                    resources = reconnect_current_stream(resources, stream_index, stream_total)
-                    runtime.stream_read_failures = 0
-                    reset_analysis_state(runtime, object_tracker)
-                    continue
-                except RuntimeError as exc:
-                    print(f"Erreur pendant la reconnexion automatique : {exc}")
-                    break
+                print("Flux obsolète: reconnexion en cours...")
+                resources = reconnect_current_stream(resources, stream_index, stream_total)
+                runtime.stream_read_failures = 0
+                reset_analysis_state(runtime, object_tracker)
+                continue
 
             register_frame_received(runtime, read_duration, reader_stats.latest_frame_age_seconds)
 

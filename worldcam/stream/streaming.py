@@ -28,7 +28,6 @@ from worldcam.core.config import (
     OUTPUT_WIDTH,
     REFERER,
     STREAM_STALE_SECONDS,
-    TARGET_FPS,
     USER_AGENT,
 )
 
@@ -131,7 +130,7 @@ def start_ffmpeg_pipe(url: str) -> subprocess.Popen:
         raise RuntimeError("ffmpeg.exe est requis pour ce fallback, mais il est introuvable dans le PATH.")
 
     command = build_ffmpeg_command(ffmpeg_path, url)
-    return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
 
 def read_ffmpeg_frame(process: subprocess.Popen) -> tuple[bool, np.ndarray | None]:

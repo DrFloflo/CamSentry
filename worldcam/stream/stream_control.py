@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import subprocess
+import time
 
 import cv2
 
@@ -37,12 +38,38 @@ def release_stream_resources(
     cap: cv2.VideoCapture | None,
     ffmpeg_process: subprocess.Popen | None,
 ) -> None:
-    """Release only the active stream resources."""
+    """Release only the active stream resources without letting stuck FFmpeg crash the app."""
     if cap is not None:
-        cap.release()
-    if ffmpeg_process is not None:
+        try:
+            cap.release()
+        except cv2.error as exc:
+            print(f"Avertissement: impossible de libérer OpenCV VideoCapture proprement: {exc}")
+
+    if ffmpeg_process is None:
+        return
+
+    for pipe in (ffmpeg_process.stdout, ffmpeg_process.stderr):
+        if pipe is not None:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+    if ffmpeg_process.poll() is not None:
+        return
+
+    try:
         ffmpeg_process.terminate()
         ffmpeg_process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        print("Avertissement: FFmpeg ne répond pas à terminate(); arrêt forcé...")
+        ffmpeg_process.kill()
+        try:
+            ffmpeg_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            print("Avertissement: FFmpeg ne s'est pas arrêté après kill(); poursuite sans crash.")
+    except OSError as exc:
+        print(f"Avertissement: erreur pendant l'arrêt de FFmpeg: {exc}")
 
 
 def start_buffered_stream_reader(
@@ -66,14 +93,54 @@ def close_active_stream(resources: StreamResources) -> None:
     """Request the active reader to stop and release its stream handles."""
     resources.stream_reader.request_stop()
     release_stream_resources(resources.cap, resources.ffmpeg_process)
+    resources.stream_reader.stop()
+
+
+def reconnect_retry_delay(attempt: int) -> int:
+    """Return the retry delay for a 5x1s, 5x5s, 5x10s, then 60s reconnect schedule."""
+    if attempt <= 5:
+        return 1
+    if attempt <= 10:
+        return 5
+    if attempt <= 15:
+        return 10
+    return 60
+
+
+def open_stream_resources_with_retry(url: str, stream_index: int, stream_total: int) -> StreamResources:
+    """Open stream resources forever using the progressive reconnect retry schedule."""
+    attempt = 1
+    while True:
+        try:
+            return open_stream_resources(url, stream_index, stream_total)
+        except RuntimeError as exc:
+            delay = reconnect_retry_delay(attempt)
+            print(f"Reconnexion en cours... tentative {attempt} pour le stream {stream_index + 1}/{stream_total}.")
+            print(f"Connexion impossible: {exc}")
+            print(f"Nouvel essai dans {delay}s...")
+            time.sleep(delay)
+            attempt += 1
 
 
 def reconnect_current_stream(resources: StreamResources, stream_index: int, stream_total: int) -> StreamResources:
-    """Reconnect the currently selected stream and return fresh resources."""
+    """Reconnect the current stream forever using a progressive retry schedule."""
     close_active_stream(resources)
-    resources = open_stream_resources(STREAM_URLS[stream_index], stream_index, stream_total)
-    print_videoio_diagnostics(STREAM_URLS[stream_index])
-    return resources
+    url = STREAM_URLS[stream_index]
+    attempt = 1
+
+    while True:
+        print(f"Reconnexion en cours... tentative {attempt} pour le stream {stream_index + 1}/{stream_total}.")
+        try:
+            resources = open_stream_resources(url, stream_index, stream_total)
+            print_videoio_diagnostics(url)
+            print("Reconnexion réussie.")
+            return resources
+        except RuntimeError as exc:
+            delay = reconnect_retry_delay(attempt)
+            print(f"Reconnexion impossible: {exc}")
+            print(f"Nouvel essai dans {delay}s...")
+            time.sleep(delay)
+            attempt += 1
 
 
 def switch_stream(resources: StreamResources, stream_index: int, step: int, stream_total: int) -> tuple[StreamResources, int]:
