@@ -1,11 +1,14 @@
 services:
   worldcam:
-    image: ultralytics/ultralytics:latest-jetson-jetpack6
+    build:
+      context: .
+      dockerfile: Dockerfile.jetson
+    image: camsentry-worldcam:jetson
     container_name: worldcam
     runtime: nvidia
     network_mode: host
     ipc: host
-    restart: unless-stopped
+    restart: "no"
     working_dir: /app
     environment:
       NVIDIA_VISIBLE_DEVICES: all
