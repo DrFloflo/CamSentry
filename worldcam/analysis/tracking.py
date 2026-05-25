@@ -7,7 +7,7 @@ import math
 import cv2
 import numpy as np
 
-from worldcam.config import (
+from worldcam.core.config import (
     COUNTING_ZONE_REAL_LENGTH_METERS,
     COUNTING_ZONE_REAL_WIDTH_METERS,
     FRAME_SKIP,
@@ -19,8 +19,8 @@ from worldcam.config import (
     SPEED_ESTIMATION_ENABLED,
     TARGET_FPS,
 )
-from worldcam.counting_zone import ZonePoints, point_inside_zone
-from worldcam.detection import Detection, get_detection_color
+from worldcam.analysis.counting_zone import ZonePoints, point_inside_zone
+from worldcam.analysis.detection import Detection, get_detection_color
 
 VEHICLE_SOURCE_CLASSES = {"car", "truck", "bus", "motorcycle"}
 VEHICLE_COUNT_KEY = "vehicle"

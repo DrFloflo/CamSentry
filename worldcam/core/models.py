@@ -11,8 +11,8 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
-from worldcam.compat import patch_ultralytics_pose26
-from worldcam.config import (
+from worldcam.core.compat import patch_ultralytics_pose26
+from worldcam.core.config import (
     INFERENCE_WIDTH,
     MODEL_ENGINE,
     MODEL_ONNX,

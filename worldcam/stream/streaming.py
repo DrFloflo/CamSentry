@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import cv2
 import numpy as np
 
-from worldcam.config import (
+from worldcam.core.config import (
     FFMPEG_ANALYZEDURATION_US,
     FFMPEG_HEADERS,
     FFMPEG_HWACCEL,

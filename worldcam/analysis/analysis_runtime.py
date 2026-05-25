@@ -2,13 +2,13 @@
 
 from ultralytics import YOLO
 
-from worldcam.counting_zone import ZonePoints
-from worldcam.detection import Detection, deduplicate_detections, run_sahi_analysis, run_yolo_analysis
-from worldcam.models import load_pose_model, load_segmentation_model
-from worldcam.pose import Pose, run_pose_analysis
-from worldcam.runtime import RuntimeState
-from worldcam.segmentation import SegmentationMask, run_segmentation_analysis
-from worldcam.tracking import ObjectTracker
+from worldcam.analysis.counting_zone import ZonePoints
+from worldcam.analysis.detection import Detection, deduplicate_detections, run_sahi_analysis, run_yolo_analysis
+from worldcam.core.models import load_pose_model, load_segmentation_model
+from worldcam.analysis.pose import Pose, run_pose_analysis
+from worldcam.core.runtime import RuntimeState
+from worldcam.analysis.segmentation import SegmentationMask, run_segmentation_analysis
+from worldcam.analysis.tracking import ObjectTracker
 
 
 def run_model_analysis(

@@ -7,13 +7,13 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-from worldcam.config import COUNTING_ZONE_COLOR, COUNTING_ZONE_EDIT_COLOR, COUNTING_ZONE_HANDLE_COLOR, COUNTING_ZONE_HANDLE_RADIUS, FRAME_INTERVAL
-from worldcam.detection import Detection, draw_yolo_detections
-from worldcam.pose import Pose, draw_pose_detections
-from worldcam.segmentation import SegmentationMask, draw_segmentation_masks
-from worldcam.stream_control import release_stream_resources
-from worldcam.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
-from worldcam.ui import draw_stream_counter
+from worldcam.core.config import COUNTING_ZONE_COLOR, COUNTING_ZONE_EDIT_COLOR, COUNTING_ZONE_HANDLE_COLOR, COUNTING_ZONE_HANDLE_RADIUS, FRAME_INTERVAL
+from worldcam.analysis.detection import Detection, draw_yolo_detections
+from worldcam.analysis.pose import Pose, draw_pose_detections
+from worldcam.analysis.segmentation import SegmentationMask, draw_segmentation_masks
+from worldcam.stream.stream_control import release_stream_resources
+from worldcam.analysis.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
+from worldcam.display.ui import draw_stream_counter
 
 ZonePoints = list[tuple[int, int]]
 

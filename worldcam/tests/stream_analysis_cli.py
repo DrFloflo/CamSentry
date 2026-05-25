@@ -5,13 +5,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from worldcam.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, STREAM_URLS, TARGET_FPS
+from worldcam.core.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, STREAM_URLS, TARGET_FPS
 
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI options for stream analysis."""
 
-    parser = argparse.ArgumentParser(description="Analyze streams configured in worldcam.config.STREAM_URLS.")
+    parser = argparse.ArgumentParser(description="Analyze streams configured in worldcam.core.config.STREAM_URLS.")
     parser.add_argument("--duration", type=float, default=15.0, help="Seconds to sample each decode profile.")
     parser.add_argument("--max-frames", type=int, default=0, help="Optional max frames per profile; 0 means no cap.")
     parser.add_argument("--stream-index", type=int, default=-1, help="Analyze only this zero-based stream index; -1 means all.")

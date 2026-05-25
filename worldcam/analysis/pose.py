@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from worldcam.models import run_resized_model_inference
-from worldcam.config import (
+from worldcam.core.models import run_resized_model_inference
+from worldcam.core.config import (
     POSE_CONFIDENCE_THRESHOLD,
     POSE_KEYPOINT_COLOR,
     POSE_SKELETON,

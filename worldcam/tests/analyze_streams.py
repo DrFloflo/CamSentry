@@ -1,4 +1,4 @@
-"""Analyze video stream health for URLs declared in worldcam.config.
+"""Analyze video stream health for URLs declared in worldcam.core.config.
 
 Runnable without pytest:
 

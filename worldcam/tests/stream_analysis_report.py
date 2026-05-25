@@ -6,7 +6,7 @@ from dataclasses import asdict
 import time
 from typing import Any
 
-from worldcam.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, TARGET_FPS
+from worldcam.core.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, TARGET_FPS
 from worldcam.tests.stream_analysis_types import SourceProbe, StreamAnalysis
 
 

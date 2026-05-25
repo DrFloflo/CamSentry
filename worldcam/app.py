@@ -6,12 +6,12 @@ import time
 import cv2
 from ultralytics import YOLO
 
-from worldcam.analysis_runtime import update_runtime_analysis
-from worldcam.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
-from worldcam.counting_zone import CountingZoneEditor
-from worldcam.display_runtime import cleanup_resources, draw_overlay, throttle_display
-from worldcam.models import load_yolo_model
-from worldcam.runtime import (
+from worldcam.analysis.analysis_runtime import update_runtime_analysis
+from worldcam.core.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
+from worldcam.analysis.counting_zone import CountingZoneEditor
+from worldcam.display.display_runtime import cleanup_resources, draw_overlay, throttle_display
+from worldcam.core.models import load_yolo_model
+from worldcam.core.runtime import (
     RuntimeState,
     register_frame_received,
     register_stream_read,
@@ -19,11 +19,11 @@ from worldcam.runtime import (
     reset_analysis_state,
     reset_stream_statistics,
 )
-from worldcam.streaming import configure_ffmpeg_http_headers, print_videoio_diagnostics
-from worldcam.stream_control import open_stream_resources, reconnect_current_stream, switch_stream
-from worldcam.tracking import ObjectTracker
-from worldcam.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
-from worldcam.web_stream import WebStreamServer, start_web_stream_server
+from worldcam.stream.streaming import configure_ffmpeg_http_headers, print_videoio_diagnostics
+from worldcam.stream.stream_control import open_stream_resources, reconnect_current_stream, switch_stream
+from worldcam.analysis.tracking import ObjectTracker
+from worldcam.display.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
+from worldcam.stream.web_stream import WebStreamServer, start_web_stream_server
 
 KEY_LEFT_VALUES = {81, 2424832}
 KEY_RIGHT_VALUES = {83, 2555904}

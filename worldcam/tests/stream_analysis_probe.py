@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
-from worldcam.config import FFMPEG_HEADERS, REFERER, USER_AGENT
+from worldcam.core.config import FFMPEG_HEADERS, REFERER, USER_AGENT
 from worldcam.tests.stream_analysis_types import HlsProbe, HlsVariant, SourceProbe
 
 

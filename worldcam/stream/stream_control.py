@@ -5,8 +5,8 @@ import subprocess
 
 import cv2
 
-from worldcam.config import STREAM_URLS, TARGET_FPS
-from worldcam.streaming import BufferedStreamReader, open_with_opencv, print_videoio_diagnostics, start_ffmpeg_pipe
+from worldcam.core.config import STREAM_URLS, TARGET_FPS
+from worldcam.stream.streaming import BufferedStreamReader, open_with_opencv, print_videoio_diagnostics, start_ffmpeg_pipe
 
 
 @dataclass

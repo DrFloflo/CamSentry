@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import cv2
 
-from worldcam.config import COUNTING_ZONE_HANDLE_RADIUS, COUNTING_ZONE_POINTS
+from worldcam.core.config import COUNTING_ZONE_HANDLE_RADIUS, COUNTING_ZONE_POINTS
 
 Point = tuple[int, int]
 ZonePoints = list[Point]

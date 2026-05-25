@@ -6,7 +6,7 @@ from sahi.postprocess.combine import NMSPostprocess
 from sahi.prediction import ObjectPrediction
 from ultralytics import YOLO
 
-from worldcam.config import (
+from worldcam.core.config import (
     DETECTION_CLASS_COLORS,
     DETECTION_FALLBACK_COLORS,
     SAHI_CONFIDENCE_THRESHOLD,
@@ -15,7 +15,7 @@ from worldcam.config import (
     SAHI_SLICE_HEIGHT,
     SAHI_SLICE_WIDTH,
 )
-from worldcam.models import run_model_inference, run_resized_model_inference
+from worldcam.core.models import run_model_inference, run_resized_model_inference
 
 Detection = tuple[int, int, int, int, str, float]
 

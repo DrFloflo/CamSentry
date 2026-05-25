@@ -4,9 +4,9 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from worldcam.config import SEGMENTATION_ALPHA, SEGMENTATION_CONTOUR_THICKNESS, SEGMENTATION_Y_OFFSET
-from worldcam.detection import get_detection_color
-from worldcam.models import run_resized_model_inference
+from worldcam.core.config import SEGMENTATION_ALPHA, SEGMENTATION_CONTOUR_THICKNESS, SEGMENTATION_Y_OFFSET
+from worldcam.analysis.detection import get_detection_color
+from worldcam.core.models import run_resized_model_inference
 
 SegmentationMask = tuple[np.ndarray, str, float]
 

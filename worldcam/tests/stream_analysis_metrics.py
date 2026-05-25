@@ -9,7 +9,7 @@ import time
 import cv2
 import numpy as np
 
-from worldcam.config import FFMPEG_REPEAT_DELTA_THRESHOLD
+from worldcam.core.config import FFMPEG_REPEAT_DELTA_THRESHOLD
 from worldcam.tests.stream_analysis_ffmpeg import read_profile_frame, start_analysis_ffmpeg_pipe, stop_ffmpeg_process
 from worldcam.tests.stream_analysis_types import StreamAnalysis
 

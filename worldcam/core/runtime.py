@@ -3,11 +3,11 @@
 from dataclasses import dataclass, field
 import time
 
-from worldcam.config import READ_WARN_SECONDS, STATS_LOG_SECONDS, STREAM_STALE_SECONDS
-from worldcam.detection import Detection
-from worldcam.pose import Pose
-from worldcam.segmentation import SegmentationMask
-from worldcam.tracking import ObjectTrack, ObjectTracker
+from worldcam.core.config import READ_WARN_SECONDS, STATS_LOG_SECONDS, STREAM_STALE_SECONDS
+from worldcam.analysis.detection import Detection
+from worldcam.analysis.pose import Pose
+from worldcam.analysis.segmentation import SegmentationMask
+from worldcam.analysis.tracking import ObjectTrack, ObjectTracker
 
 
 @dataclass

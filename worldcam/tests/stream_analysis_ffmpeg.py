@@ -7,7 +7,7 @@ import subprocess
 
 import numpy as np
 
-from worldcam.config import (
+from worldcam.core.config import (
     FFMPEG_ANALYZEDURATION_US,
     FFMPEG_HEADERS,
     FFMPEG_HWACCEL,

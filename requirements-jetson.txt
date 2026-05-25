@@ -5,12 +5,3 @@ requests
 sahi
 fastapi
 uvicorn
-isort
-colored
-polygraphy
-PyYAML
-matplotlib
-pandas
-scipy
-psutil
-py-cpuinfo

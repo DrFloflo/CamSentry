@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 import multiprocessing as mp
 
-from worldcam.config import COUNTING_ZONE_EDIT_ENABLED, COUNTING_ZONE_ENABLED, PERSON_TRACK_ENABLED, SAHI_ENABLED, SEGMENTATION_ENABLED
+from worldcam.core.config import COUNTING_ZONE_EDIT_ENABLED, COUNTING_ZONE_ENABLED, PERSON_TRACK_ENABLED, SAHI_ENABLED, SEGMENTATION_ENABLED
 
 
 @dataclass(frozen=True)
