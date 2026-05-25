@@ -7,7 +7,7 @@ import cv2
 from ultralytics import YOLO
 
 from worldcam.analysis.analysis_runtime import update_runtime_analysis
-from worldcam.core.config import DEFAULT_CLASS_NAMES, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
+from worldcam.core.config import DEFAULT_CLASS_NAMES, DEFAULT_MODEL_KEY, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
 from worldcam.analysis.counting_zone import CountingZoneEditor
 from worldcam.display.display_runtime import cleanup_resources, draw_overlay, throttle_display
 from worldcam.core.models import load_yolo_model
@@ -73,6 +73,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse WorldCam command-line options."""
     parser = argparse.ArgumentParser(description="Run the WorldCam analysis application.")
     parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL_KEY,
+        help=(
+            "YOLO model key used from models/ without the 'yolo' prefix "
+            "(examples: 26l loads yolo26l.*, 26m loads yolo26m.*, with matching -pose/-seg variants)."
+        ),
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Disable OpenCV windows and publish the annotated stream over HTTP.",
@@ -103,7 +111,8 @@ def main(argv: list[str] | None = None) -> None:
     stream_index = 0
     print_videoio_diagnostics(STREAM_URLS[stream_index])
 
-    model, device = load_yolo_model()
+    model_key = args.model.strip().removeprefix("yolo")
+    model, device = load_yolo_model(model_key)
     pose_model = None
     segmentation_model = None
 
@@ -184,6 +193,7 @@ def main(argv: list[str] | None = None) -> None:
                     object_tracker,
                     counting_zone_editor.points,
                     menu_snapshot.counting_zone_enabled,
+                    model_key,
                 )
 
             draw_overlay(

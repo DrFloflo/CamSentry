@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import importlib
 import importlib.metadata
+from pathlib import Path
 import platform
 import sys
 
@@ -12,18 +13,7 @@ import torch
 from ultralytics import YOLO
 
 from worldcam.core.compat import patch_ultralytics_pose26
-from worldcam.core.config import (
-    INFERENCE_WIDTH,
-    MODEL_ENGINE,
-    MODEL_ONNX,
-    MODEL_PT,
-    POSE_MODEL_ENGINE,
-    POSE_MODEL_ONNX,
-    POSE_MODEL_PT,
-    SEGMENTATION_MODEL_ENGINE,
-    SEGMENTATION_MODEL_ONNX,
-    SEGMENTATION_MODEL_PT,
-)
+from worldcam.core.config import DEFAULT_MODEL_KEY, INFERENCE_WIDTH, MODEL_BACKEND_EXTENSIONS, MODEL_FILE_PREFIX, MODELS_DIR
 
 
 @dataclass(frozen=True)
@@ -114,11 +104,23 @@ def warm_up_model(model: YOLO, label: str, device: str) -> None:
     run_model_inference(model, dummy_image, device)
 
 
+def build_model_candidates(model_key: str = DEFAULT_MODEL_KEY, variant: str = "") -> list[tuple[str, str]]:
+    """Build backend candidates for a model key and optional YOLO variant suffix."""
+    model_stem = f"{MODEL_FILE_PREFIX}{model_key}{variant}"
+    return [
+        (backend_name, str(Path(MODELS_DIR) / f"{model_stem}.{extension}"))
+        for backend_name, extension in MODEL_BACKEND_EXTENSIONS
+    ]
+
+
 def load_backend_model(label: str, candidates: list[tuple[str, str]], device: str) -> YOLO:
-    """Load the first available backend and fall back with diagnostics on failure."""
+    """Load the first existing backend and fall back with diagnostics on failure."""
     last_error = None
 
     for backend_name, model_path in candidates:
+        if not Path(model_path).is_file():
+            print(f"Backend {backend_name} introuvable pour {label}: {model_path}")
+            continue
         try:
             print(f"Chargement {label} via {backend_name}: {model_path}")
             model = YOLO(model_path)
@@ -137,35 +139,23 @@ def load_backend_model(label: str, candidates: list[tuple[str, str]], device: st
     raise RuntimeError(f"Impossible de charger {label}; dernier échec: {last_error}")
 
 
-def load_yolo_model() -> tuple[YOLO, str]:
-    """Load YOLO, preferring TensorRT, then ONNX, then PyTorch."""
+def load_yolo_model(model_key: str = DEFAULT_MODEL_KEY) -> tuple[YOLO, str]:
+    """Load YOLO for the selected model key, preferring TensorRT, then ONNX, then PyTorch."""
     patch_ultralytics_pose26()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Périphérique YOLO utilisé: {device}")
 
-    model = load_backend_model(
-        "YOLO",
-        [("TensorRT", MODEL_ENGINE), ("ONNX", MODEL_ONNX), ("PyTorch", MODEL_PT)],
-        device,
-    )
+    model = load_backend_model("YOLO", build_model_candidates(model_key), device)
     return model, device
 
 
-def load_segmentation_model(device: str) -> YOLO:
-    """Load the YOLO segmentation model, preferring TensorRT, then ONNX, then PyTorch."""
+def load_segmentation_model(device: str, model_key: str = DEFAULT_MODEL_KEY) -> YOLO:
+    """Load the YOLO segmentation model for the selected key, preferring TensorRT, then ONNX, then PyTorch."""
     patch_ultralytics_pose26()
-    return load_backend_model(
-        "YOLO segmentation",
-        [("TensorRT", SEGMENTATION_MODEL_ENGINE), ("ONNX", SEGMENTATION_MODEL_ONNX), ("PyTorch", SEGMENTATION_MODEL_PT)],
-        device,
-    )
+    return load_backend_model("YOLO segmentation", build_model_candidates(model_key, "-seg"), device)
 
 
-def load_pose_model(device: str) -> YOLO:
-    """Load the YOLO pose model, preferring TensorRT, then ONNX, then PyTorch."""
+def load_pose_model(device: str, model_key: str = DEFAULT_MODEL_KEY) -> YOLO:
+    """Load the YOLO pose model for the selected key, preferring TensorRT, then ONNX, then PyTorch."""
     patch_ultralytics_pose26()
-    return load_backend_model(
-        "YOLO pose",
-        [("TensorRT", POSE_MODEL_ENGINE), ("ONNX", POSE_MODEL_ONNX), ("PyTorch", POSE_MODEL_PT)],
-        device,
-    )
+    return load_backend_model("YOLO pose", build_model_candidates(model_key, "-pose"), device)

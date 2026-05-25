@@ -24,6 +24,7 @@ def run_model_analysis(
     pose_enabled: bool,
     segmentation_enabled: bool,
     sahi_enabled: bool = False,
+    model_key: str = "",
 ) -> tuple[list[Detection], list[Pose], list[SegmentationMask], YOLO | None, YOLO | None]:
     """Run object and optional pose analysis while preserving previous results on errors."""
     try:
@@ -37,7 +38,7 @@ def run_model_analysis(
     if segmentation_enabled:
         if segmentation_model is None:
             try:
-                segmentation_model = load_segmentation_model(device)
+                segmentation_model = load_segmentation_model(device, model_key)
             except Exception as exc:
                 print(f"Erreur pendant le chargement du modèle segmentation YOLO: {exc}")
                 latest_segmentations = []
@@ -54,7 +55,7 @@ def run_model_analysis(
 
     if pose_model is None:
         try:
-            pose_model = load_pose_model(device)
+            pose_model = load_pose_model(device, model_key)
         except Exception as exc:
             print(f"Erreur pendant le chargement du modèle pose YOLO: {exc}")
             return latest_detections, latest_poses, latest_segmentations, pose_model, segmentation_model
@@ -82,6 +83,7 @@ def update_runtime_analysis(
     object_tracker: ObjectTracker,
     counting_zone_points: ZonePoints | None = None,
     counting_zone_enabled: bool = False,
+    model_key: str = "",
 ) -> tuple[YOLO | None, YOLO | None]:
     """Run enabled analyses and refresh runtime result caches."""
     (
@@ -103,6 +105,7 @@ def update_runtime_analysis(
         pose_enabled,
         segmentation_enabled,
         sahi_enabled,
+        model_key,
     )
 
     runtime.latest_detections = deduplicate_detections(runtime.latest_detections)

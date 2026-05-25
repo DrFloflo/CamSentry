@@ -40,15 +40,14 @@ FFMPEG_HWACCEL = ""
 FFMPEG_REPEAT_DELTA_THRESHOLD = 1.0
 FFMPEG_REPEAT_SAMPLE_SIZE = (64, 36)
 
-MODEL_PT = "models/yolo26l.pt"
-MODEL_ONNX = "models/yolo26l.onnx"
-MODEL_ENGINE = "models/yolo26l.engine"
-POSE_MODEL_PT = "models/yolo26m-pose.pt"
-POSE_MODEL_ONNX = "models/yolo26m-pose.onnx"
-POSE_MODEL_ENGINE = "models/yolo26m-pose.engine"
-SEGMENTATION_MODEL_PT = "models/yolo26m-seg.pt"
-SEGMENTATION_MODEL_ONNX = "models/yolo26m-seg.onnx"
-SEGMENTATION_MODEL_ENGINE = "models/yolo26m-seg.engine"
+MODELS_DIR = "models"
+MODEL_FILE_PREFIX = "yolo"
+DEFAULT_MODEL_KEY = "26m"
+MODEL_BACKEND_EXTENSIONS = (
+    ("TensorRT", "engine"),
+    ("ONNX", "onnx"),
+    ("PyTorch", "pt"),
+)
 DEFAULT_CLASS_NAMES = {"person", "car", "bicycle", "motorcycle", "bus", "truck", "airplane"}
 INFERENCE_WIDTH = 640
 FRAME_SKIP = 2
