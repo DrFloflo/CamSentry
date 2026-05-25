@@ -7,7 +7,15 @@ import cv2
 from ultralytics import YOLO
 
 from worldcam.analysis.analysis_runtime import update_runtime_analysis
-from worldcam.core.config import DEFAULT_CLASS_NAMES, DEFAULT_MODEL_KEY, FRAME_SKIP, MAX_STREAM_READ_FAILURES, STREAM_READ_TIMEOUT_SECONDS, STREAM_URLS
+from worldcam.core.config import (
+    DEFAULT_CLASS_NAMES,
+    DEFAULT_MODEL_KEY,
+    FRAME_SKIP,
+    MAX_STREAM_READ_FAILURES,
+    SAHI_ENABLED,
+    STREAM_READ_TIMEOUT_SECONDS,
+    STREAM_URLS,
+)
 from worldcam.analysis.counting_zone import CountingZoneEditor
 from worldcam.display.display_runtime import cleanup_resources, draw_overlay, throttle_display
 from worldcam.core.models import load_yolo_model
@@ -81,6 +89,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--sahi",
+        action="store_true",
+        default=SAHI_ENABLED,
+        help="Enable SAHI sliced inference at startup.",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Disable OpenCV windows and publish the annotated stream over HTTP.",
@@ -125,7 +139,7 @@ def main(argv: list[str] | None = None) -> None:
     runtime = RuntimeState()
     object_tracker = ObjectTracker()
     class_names, selected_class_names = build_class_selection(model)
-    menu_state = MenuState()
+    menu_state = MenuState(sahi_enabled=args.sahi)
     counting_zone_editor = CountingZoneEditor()
     web_stream_server: WebStreamServer | None = None
 
