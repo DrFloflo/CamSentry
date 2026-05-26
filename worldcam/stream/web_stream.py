@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 import threading
 import time
 
 import cv2
+
+from worldcam.analysis.count_persistence import VehicleCountStore
 
 
 BOUNDARY = "frame"
@@ -111,12 +114,13 @@ class FrameBuffer:
 def create_app(frame_buffer: FrameBuffer):
     """Create the FastAPI app used by the headless MJPEG stream."""
     try:
-        from fastapi import FastAPI
-        from fastapi.responses import HTMLResponse, StreamingResponse
+        from fastapi import FastAPI, HTTPException, Query
+        from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
     except ImportError as exc:  # pragma: no cover - dependency is runtime-only for headless mode
         raise RuntimeError("fastapi is required for WorldCam headless streaming") from exc
 
     app = FastAPI(title="WorldCam Headless Stream")
+    count_store = VehicleCountStore()
 
     def frame_generator():
         last_frame_id = 0
@@ -152,6 +156,14 @@ def create_app(frame_buffer: FrameBuffer):
             </html>
             """
         )
+
+    @app.get("/json_data")
+    def json_data(day: date | None = Query(default=None, alias="date")):
+        try:
+            snapshot = count_store.read_day_snapshot(day)
+        except ValueError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return JSONResponse(content=snapshot, headers={"Cache-Control": "no-store"})
 
     @app.get("/video_feed")
     def video_feed():

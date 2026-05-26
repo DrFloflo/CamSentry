@@ -39,6 +39,23 @@ class VehicleCountStore:
         self.document = self.load_day(self.current_date)
         return self.total()
 
+    def read_day_snapshot(self, day: date | None = None) -> dict[str, Any]:
+        """Read a daily JSON document without changing the active counter state."""
+        target_day = day or self.today()
+        file_path = self._file_path(target_day)
+        if not file_path.exists():
+            return self._new_document(target_day)
+
+        try:
+            with file_path.open("r", encoding="utf-8") as file:
+                loaded = json.load(file)
+            if not isinstance(loaded, dict):
+                raise ValueError("Daily count JSON root must be an object.")
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError(f"Impossible de lire le fichier de comptage {file_path}: {exc}") from exc
+
+        return self._normalize_snapshot(target_day, loaded)
+
     def record_vehicle_event(
         self,
         *,
@@ -101,6 +118,11 @@ class VehicleCountStore:
         return self._normalize_document(day, loaded)
 
     def _normalize_document(self, day: date, document: dict[str, Any]) -> dict[str, Any]:
+        normalized = self._normalize_snapshot(day, document)
+        self._write_document(day, normalized)
+        return normalized
+
+    def _normalize_snapshot(self, day: date, document: dict[str, Any]) -> dict[str, Any]:
         now = self._now_isoformat()
         events = document.get("events")
         if not isinstance(events, list):
@@ -121,7 +143,7 @@ class VehicleCountStore:
         else:
             by_class = {str(class_name): int(count) for class_name, count in by_class.items() if isinstance(count, int)}
 
-        normalized = {
+        return {
             "schema_version": int(document.get("schema_version", SCHEMA_VERSION)),
             "date": day.isoformat(),
             "timezone": str(document.get("timezone", self.timezone_name)),
@@ -133,8 +155,6 @@ class VehicleCountStore:
             },
             "events": normalized_events,
         }
-        self._write_document(day, normalized)
-        return normalized
 
     def _new_document(self, day: date) -> dict[str, Any]:
         now = self._now_isoformat()
