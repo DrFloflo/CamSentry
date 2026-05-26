@@ -1,7 +1,6 @@
 """Lightweight backend-independent object tracking utilities."""
 
 from dataclasses import dataclass, field
-from datetime import date
 import math
 
 import cv2
@@ -19,6 +18,7 @@ from worldcam.core.config import (
     SPEED_ESTIMATION_ENABLED,
     TARGET_FPS,
 )
+from worldcam.analysis.count_persistence import VehicleCountStore
 from worldcam.analysis.counting_zone import ZonePoints, point_inside_zone
 from worldcam.analysis.detection import Detection, get_detection_color
 
@@ -94,9 +94,10 @@ class VehicleCounter:
     """Cumulative vehicle counter for confirmed car/truck tracks."""
 
     def __init__(self) -> None:
-        self.counts = {VEHICLE_COUNT_KEY: 0}
+        self.count_store = VehicleCountStore()
+        self.counts = {VEHICLE_COUNT_KEY: self.count_store.total()}
         self.counted_memory: list[CountedVehicle] = []
-        self.count_date = date.today()
+        self.count_date = self.count_store.current_date
 
     def reset_memory(self) -> None:
         """Clear compatibility memory without resetting cumulative counts."""
@@ -104,13 +105,14 @@ class VehicleCounter:
 
     def reset_daily_counts_if_needed(self) -> None:
         """Reset vehicle counts when the local calendar day changes, logging the previous total first."""
-        current_date = date.today()
+        current_date = self.count_store.today()
         if current_date == self.count_date:
             return
 
         previous_total = self.counts.get(VEHICLE_COUNT_KEY, 0)
         print(f"Daily vehicle counter reset: date={self.count_date.isoformat()}, vehicles_counted={previous_total}")
-        self.counts[VEHICLE_COUNT_KEY] = 0
+        restored_total = self.count_store.open_day(current_date)
+        self.counts[VEHICLE_COUNT_KEY] = restored_total
         self.counted_memory.clear()
         self.count_date = current_date
 
@@ -128,10 +130,11 @@ class VehicleCounter:
                 continue
             self.counts[VEHICLE_COUNT_KEY] += 1
             speed_kmh = estimate_track_speed_kmh(track, zone_points)
-            speed_text = "n/a" if speed_kmh is None else f"{speed_kmh:.1f} km/h"
-            print(
-                f"Véhicule compté: id={track.track_id}, classe={track.class_name}, "
-                f"vitesse_estimée={speed_text}, total={self.counts[VEHICLE_COUNT_KEY]}"
+            self.count_store.record_vehicle_event(
+                track_id=track.track_id,
+                class_name=track.class_name,
+                total_after_event=self.counts[VEHICLE_COUNT_KEY],
+                speed_kmh=speed_kmh,
             )
             track.counted = True
 

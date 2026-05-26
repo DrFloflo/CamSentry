@@ -7,3 +7,4 @@ yolo26*
 .gitignore
 models/face_detection_yunet_2023mar.onnx
 models/face_detection_yunet_2023mar.engine
+worldcam/data/counts/*
