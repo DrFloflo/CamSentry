@@ -8,7 +8,7 @@ services:
     runtime: nvidia
     network_mode: host
     ipc: host
-    restart: "no"
+    restart: "unless-stopped"
     working_dir: /app
     environment:
       NVIDIA_VISIBLE_DEVICES: all
