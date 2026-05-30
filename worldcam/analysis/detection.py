@@ -15,6 +15,7 @@ from worldcam.core.config import (
     SAHI_SLICE_HEIGHT,
     SAHI_SLICE_WIDTH,
 )
+from worldcam.analysis.counting_zone import ZonePoints
 from worldcam.core.models import run_model_inference, run_resized_model_inference
 
 Detection = tuple[int, int, int, int, str, float]
@@ -31,6 +32,8 @@ def extract_yolo_detections(
     scale_x: float,
     scale_y: float,
     selected_class_names: set[str],
+    offset_x: int = 0,
+    offset_y: int = 0,
 ) -> list[Detection]:
     """Convert selected YOLO results to original-frame coordinates."""
     detections = []
@@ -42,14 +45,45 @@ def extract_yolo_detections(
 
         confidence = float(box.conf)
         x1, y1, x2, y2 = [int(value) for value in box.xyxy[0]]
-        final_x1 = int(x1 * scale_x)
-        final_y1 = int(y1 * scale_y)
-        final_x2 = int(x2 * scale_x)
-        final_y2 = int(y2 * scale_y)
+        final_x1 = int(x1 * scale_x) + offset_x
+        final_y1 = int(y1 * scale_y) + offset_y
+        final_x2 = int(x2 * scale_x) + offset_x
+        final_y2 = int(y2 * scale_y) + offset_y
         label = f"{cls_name} {confidence:.2f}"
         detections.append((final_x1, final_y1, final_x2, final_y2, label, confidence))
 
     return detections
+
+
+def crop_frame_for_exclusion_zone(
+    frame: np.ndarray,
+    exclusion_zone_points: ZonePoints | None,
+    exclusion_zone_enabled: bool,
+) -> tuple[np.ndarray, int, int]:
+    """Return a cropped analysis frame that excludes the configured polygon whenever possible."""
+    points = exclusion_zone_points or []
+    if not exclusion_zone_enabled or len(points) < 3:
+        return frame, 0, 0
+
+    frame_h, frame_w = frame.shape[:2]
+    contour = np.array(points, dtype=np.int32)
+    excluded_mask = np.zeros((frame_h, frame_w), dtype=np.uint8)
+    cv2.fillPoly(excluded_mask, [contour], 1)
+    included_y, included_x = np.where(excluded_mask == 0)
+    if included_x.size == 0 or included_y.size == 0:
+        return frame, 0, 0
+
+    x1 = int(included_x.min())
+    y1 = int(included_y.min())
+    x2 = int(included_x.max()) + 1
+    y2 = int(included_y.max()) + 1
+    analysis_frame = frame[y1:y2, x1:x2].copy()
+
+    excluded_crop = excluded_mask[y1:y2, x1:x2].astype(bool)
+    if excluded_crop.any():
+        analysis_frame[excluded_crop] = 0
+
+    return analysis_frame, x1, y1
 
 
 def run_yolo_analysis(
@@ -57,15 +91,20 @@ def run_yolo_analysis(
     model: YOLO,
     device: str,
     selected_class_names: set[str],
+    exclusion_zone_points: ZonePoints | None = None,
+    exclusion_zone_enabled: bool = False,
 ) -> list[Detection]:
-    """Resize the frame, run YOLO inference, and return detections for the original frame."""
-    inference = run_resized_model_inference(model, frame, device)
+    """Resize the analysis area, run YOLO inference, and return detections for the original frame."""
+    analysis_frame, offset_x, offset_y = crop_frame_for_exclusion_zone(frame, exclusion_zone_points, exclusion_zone_enabled)
+    inference = run_resized_model_inference(model, analysis_frame, device)
     return extract_yolo_detections(
         inference.results,
         model,
         inference.scale_x,
         inference.scale_y,
         selected_class_names,
+        offset_x,
+        offset_y,
     )
 
 
@@ -87,6 +126,8 @@ def extract_sliced_yolo_predictions(
     model: YOLO,
     device: str,
     selected_class_names: set[str],
+    offset_x: int = 0,
+    offset_y: int = 0,
 ) -> list[ObjectPrediction]:
     """Run tiled YOLO inference and convert each tile result into SAHI predictions."""
     frame_h, frame_w, _ = frame.shape
@@ -114,15 +155,15 @@ def extract_sliced_yolo_predictions(
                 object_predictions.append(
                     ObjectPrediction(
                         bbox=[
-                            max(0, min(frame_w - 1, int(x1 + x_start))),
-                            max(0, min(frame_h - 1, int(y1 + y_start))),
-                            max(0, min(frame_w - 1, int(x2 + x_start))),
-                            max(0, min(frame_h - 1, int(y2 + y_start))),
+                            max(0, min(frame_w - 1, int(x1 + x_start))) + offset_x,
+                            max(0, min(frame_h - 1, int(y1 + y_start))) + offset_y,
+                            max(0, min(frame_w - 1, int(x2 + x_start))) + offset_x,
+                            max(0, min(frame_h - 1, int(y2 + y_start))) + offset_y,
                         ],
                         category_id=cls_id,
                         category_name=cls_name,
                         score=confidence,
-                        full_shape=[frame_h, frame_w],
+                        full_shape=[frame_h + offset_y, frame_w + offset_x],
                     )
                 )
 
@@ -153,18 +194,21 @@ def run_sahi_analysis(
     model: YOLO,
     device: str,
     selected_class_names: set[str],
+    exclusion_zone_points: ZonePoints | None = None,
+    exclusion_zone_enabled: bool = False,
 ) -> list[Detection]:
     """Run SAHI-style sliced inference with the active YOLO backend, including TensorRT engines."""
-    frame_h, frame_w, _ = frame.shape
-    object_predictions = extract_sliced_yolo_predictions(frame, model, device, selected_class_names)
+    original_h, original_w, _ = frame.shape
+    analysis_frame, offset_x, offset_y = crop_frame_for_exclusion_zone(frame, exclusion_zone_points, exclusion_zone_enabled)
+    object_predictions = extract_sliced_yolo_predictions(analysis_frame, model, device, selected_class_names, offset_x, offset_y)
     if not object_predictions:
         return []
     if len(object_predictions) == 1:
-        return convert_sahi_predictions_to_detections(object_predictions, frame_w, frame_h)
+        return convert_sahi_predictions_to_detections(object_predictions, original_w, original_h)
 
     nms_postprocess = NMSPostprocess(match_threshold=0.5, match_metric="IOU", class_agnostic=False)
     combined_predictions = nms_postprocess(object_predictions)
-    return convert_sahi_predictions_to_detections(combined_predictions, frame_w, frame_h)
+    return convert_sahi_predictions_to_detections(combined_predictions, original_w, original_h)
 
 
 def get_detection_class_name(detection: Detection) -> str:

@@ -15,8 +15,9 @@ from worldcam.core.config import (
     SAHI_ENABLED,
     STREAM_READ_TIMEOUT_SECONDS,
     STREAM_URL,
+    EXCLUSION_ZONE_POINTS,
 )
-from worldcam.analysis.counting_zone import CountingZoneEditor
+from worldcam.analysis.counting_zone import CountingZoneEditor, CountingZoneState
 from worldcam.display.display_runtime import cleanup_resources, draw_overlay, throttle_display
 from worldcam.core.models import load_yolo_model
 from worldcam.core.runtime import (
@@ -65,6 +66,7 @@ def handle_menu_changes(
         or changes.sahi_toggled
         or changes.tracking_toggled
         or changes.segmentation_toggled
+        or changes.exclusion_zone_processing_toggled
     ):
         runtime.latest_detections = []
         runtime.latest_segmentations = []
@@ -130,13 +132,18 @@ def main(argv: list[str] | None = None) -> None:
     class_names, selected_class_names = build_class_selection(model)
     menu_state = MenuState(sahi_enabled=args.sahi)
     counting_zone_editor = CountingZoneEditor()
+    exclusion_zone_editor = CountingZoneEditor(CountingZoneState(points=list(EXCLUSION_ZONE_POINTS), print_name="exclusion_zone_points"))
     web_stream_server: WebStreamServer | None = None
 
     if args.headless:
         web_stream_server = start_web_stream_server(args.stream_host, args.stream_port)
     else:
         cv2.namedWindow(MAIN_WINDOW_NAME)
-        cv2.setMouseCallback(MAIN_WINDOW_NAME, counting_zone_editor.mouse_callback)
+        cv2.setMouseCallback(MAIN_WINDOW_NAME, lambda event, x, y, flags, param: (
+            exclusion_zone_editor.mouse_callback(event, x, y, flags, param)
+            if exclusion_zone_editor.state.edit_enabled
+            else counting_zone_editor.mouse_callback(event, x, y, flags, param)
+        ))
 
     try:
         while True:
@@ -169,9 +176,12 @@ def main(argv: list[str] | None = None) -> None:
             register_frame_received(runtime, read_duration, reader_stats.latest_frame_age_seconds)
 
             counting_zone_editor.update_frame_size(frame)
+            exclusion_zone_editor.update_frame_size(frame)
             menu_snapshot = snapshot_menu_state(menu_state, selected_class_names)
             counting_zone_editor.set_enabled(menu_snapshot.counting_zone_enabled)
-            counting_zone_editor.set_edit_enabled(menu_snapshot.counting_zone_edit_enabled)
+            counting_zone_editor.set_edit_enabled(menu_snapshot.counting_zone_edit_enabled and not menu_snapshot.exclusion_zone_edit_enabled)
+            exclusion_zone_editor.set_enabled(menu_snapshot.exclusion_zone_display_enabled)
+            exclusion_zone_editor.set_edit_enabled(menu_snapshot.exclusion_zone_edit_enabled)
             if runtime.frame_count % FRAME_SKIP == 0:
                 pose_model, segmentation_model = update_runtime_analysis(
                     runtime,
@@ -189,6 +199,8 @@ def main(argv: list[str] | None = None) -> None:
                     counting_zone_editor.points,
                     menu_snapshot.counting_zone_enabled,
                     model_key,
+                    exclusion_zone_editor.points,
+                    menu_snapshot.exclusion_zone_processing_enabled and not args.headless,
                 )
 
             draw_overlay(
@@ -204,7 +216,11 @@ def main(argv: list[str] | None = None) -> None:
                 menu_snapshot.tracking_enabled,
                 counting_zone_editor.points,
                 menu_snapshot.counting_zone_enabled,
-                menu_snapshot.counting_zone_edit_enabled,
+                menu_snapshot.counting_zone_edit_enabled and not menu_snapshot.exclusion_zone_edit_enabled,
+                exclusion_zone_editor.points,
+                menu_snapshot.exclusion_zone_display_enabled and not args.headless,
+                menu_snapshot.exclusion_zone_processing_enabled and not args.headless,
+                menu_snapshot.exclusion_zone_edit_enabled and not args.headless,
             )
             if web_stream_server is not None:
                 web_stream_server.update_frame(frame)

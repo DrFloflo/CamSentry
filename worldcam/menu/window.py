@@ -9,6 +9,9 @@ from worldcam.menu.constants import (
     MENU_EVENT_CLOSED,
     MENU_EVENT_COUNTING_ZONE_EDIT,
     MENU_EVENT_COUNTING_ZONE_ENABLED,
+    MENU_EVENT_EXCLUSION_ZONE_DISPLAY,
+    MENU_EVENT_EXCLUSION_ZONE_EDIT,
+    MENU_EVENT_EXCLUSION_ZONE_PROCESSING,
     MENU_EVENT_POSE,
     MENU_EVENT_SAHI,
     MENU_EVENT_TRACKING,
@@ -29,6 +32,9 @@ def run_class_menu_process(
     display_threshold: float,
     counting_zone_enabled: bool,
     counting_zone_edit_enabled: bool,
+    exclusion_zone_display_enabled: bool,
+    exclusion_zone_processing_enabled: bool,
+    exclusion_zone_edit_enabled: bool,
     event_queue: mp.Queue,
     command_queue: mp.Queue,
 ) -> None:
@@ -64,6 +70,9 @@ def run_class_menu_process(
     threshold_label_var = tk.StringVar(value=f"Threshold: {display_threshold:.2f}")
     counting_zone_var = tk.BooleanVar(value=counting_zone_enabled)
     counting_zone_edit_var = tk.BooleanVar(value=counting_zone_edit_enabled)
+    exclusion_zone_display_var = tk.BooleanVar(value=exclusion_zone_display_enabled)
+    exclusion_zone_processing_var = tk.BooleanVar(value=exclusion_zone_processing_enabled)
+    exclusion_zone_edit_var = tk.BooleanVar(value=exclusion_zone_edit_enabled)
 
     def toggle_pose() -> None:
         event_queue.put((MENU_EVENT_POSE, bool(pose_var.get())))
@@ -88,6 +97,15 @@ def run_class_menu_process(
     def toggle_counting_zone_edit() -> None:
         event_queue.put((MENU_EVENT_COUNTING_ZONE_EDIT, bool(counting_zone_edit_var.get())))
 
+    def toggle_exclusion_zone_display() -> None:
+        event_queue.put((MENU_EVENT_EXCLUSION_ZONE_DISPLAY, bool(exclusion_zone_display_var.get())))
+
+    def toggle_exclusion_zone_processing() -> None:
+        event_queue.put((MENU_EVENT_EXCLUSION_ZONE_PROCESSING, bool(exclusion_zone_processing_var.get())))
+
+    def toggle_exclusion_zone_edit() -> None:
+        event_queue.put((MENU_EVENT_EXCLUSION_ZONE_EDIT, bool(exclusion_zone_edit_var.get())))
+
     ttk.Checkbutton(top_frame, text="Pose", variable=pose_var, command=toggle_pose, style="WorldCam.TCheckbutton").pack(side="left")
     ttk.Checkbutton(top_frame, text="SAHI", variable=sahi_var, command=toggle_sahi, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
     ttk.Checkbutton(top_frame, text="Tracking", variable=tracking_var, command=toggle_tracking, style="WorldCam.TCheckbutton").pack(side="left", padx=(24, 0))
@@ -109,6 +127,30 @@ def run_class_menu_process(
         command=toggle_counting_zone_edit,
         style="WorldCam.TCheckbutton",
     ).pack(side="left", padx=(24, 0), pady=6)
+
+    exclusion_zone_frame = ttk.LabelFrame(root, text="Zone d'exclusion")
+    exclusion_zone_frame.pack(fill="x", padx=10, pady=(0, 8))
+    ttk.Checkbutton(
+        exclusion_zone_frame,
+        text="Afficher",
+        variable=exclusion_zone_display_var,
+        command=toggle_exclusion_zone_display,
+        style="WorldCam.TCheckbutton",
+    ).pack(side="left", padx=(8, 0), pady=6)
+    ttk.Checkbutton(
+        exclusion_zone_frame,
+        text="Exclure YOLO/SAHI",
+        variable=exclusion_zone_processing_var,
+        command=toggle_exclusion_zone_processing,
+        style="WorldCam.TCheckbutton",
+    ).pack(side="left", padx=(18, 0), pady=6)
+    ttk.Checkbutton(
+        exclusion_zone_frame,
+        text="Edition",
+        variable=exclusion_zone_edit_var,
+        command=toggle_exclusion_zone_edit,
+        style="WorldCam.TCheckbutton",
+    ).pack(side="left", padx=(18, 0), pady=6)
 
     threshold_frame = ttk.Frame(root)
     threshold_frame.pack(fill="x", padx=10, pady=(0, 8))
@@ -233,6 +275,18 @@ def run_class_menu_process(
         if key == "e":
             counting_zone_edit_var.set(not counting_zone_edit_var.get())
             toggle_counting_zone_edit()
+            return "break"
+        if key == "x":
+            exclusion_zone_display_var.set(not exclusion_zone_display_var.get())
+            toggle_exclusion_zone_display()
+            return "break"
+        if key == "c":
+            exclusion_zone_processing_var.set(not exclusion_zone_processing_var.get())
+            toggle_exclusion_zone_processing()
+            return "break"
+        if key == "v":
+            exclusion_zone_edit_var.set(not exclusion_zone_edit_var.get())
+            toggle_exclusion_zone_edit()
             return "break"
         if key == "space":
             if 0 <= current_index < len(class_vars):

@@ -3,7 +3,16 @@
 from dataclasses import dataclass, field
 import multiprocessing as mp
 
-from worldcam.core.config import COUNTING_ZONE_EDIT_ENABLED, COUNTING_ZONE_ENABLED, PERSON_TRACK_ENABLED, SAHI_ENABLED, SEGMENTATION_ENABLED
+from worldcam.core.config import (
+    COUNTING_ZONE_EDIT_ENABLED,
+    COUNTING_ZONE_ENABLED,
+    EXCLUSION_ZONE_DISPLAY_ENABLED,
+    EXCLUSION_ZONE_EDIT_ENABLED,
+    EXCLUSION_ZONE_PROCESSING_ENABLED,
+    PERSON_TRACK_ENABLED,
+    SAHI_ENABLED,
+    SEGMENTATION_ENABLED,
+)
 
 
 @dataclass(frozen=True)
@@ -18,6 +27,9 @@ class MenuChanges:
     threshold_changed: bool = False
     counting_zone_toggled: bool = False
     counting_zone_edit_toggled: bool = False
+    exclusion_zone_display_toggled: bool = False
+    exclusion_zone_processing_toggled: bool = False
+    exclusion_zone_edit_toggled: bool = False
 
     def merge(self, other: "MenuChanges") -> "MenuChanges":
         """Return changes containing every flag set in either instance."""
@@ -30,6 +42,9 @@ class MenuChanges:
             threshold_changed=self.threshold_changed or other.threshold_changed,
             counting_zone_toggled=self.counting_zone_toggled or other.counting_zone_toggled,
             counting_zone_edit_toggled=self.counting_zone_edit_toggled or other.counting_zone_edit_toggled,
+            exclusion_zone_display_toggled=self.exclusion_zone_display_toggled or other.exclusion_zone_display_toggled,
+            exclusion_zone_processing_toggled=self.exclusion_zone_processing_toggled or other.exclusion_zone_processing_toggled,
+            exclusion_zone_edit_toggled=self.exclusion_zone_edit_toggled or other.exclusion_zone_edit_toggled,
         )
 
 
@@ -45,6 +60,9 @@ class MenuSnapshot:
     display_threshold: float
     counting_zone_enabled: bool
     counting_zone_edit_enabled: bool
+    exclusion_zone_display_enabled: bool
+    exclusion_zone_processing_enabled: bool
+    exclusion_zone_edit_enabled: bool
 
 
 @dataclass
@@ -60,6 +78,9 @@ class MenuState:
     display_threshold: float = 0.5
     counting_zone_enabled: bool = COUNTING_ZONE_ENABLED
     counting_zone_edit_enabled: bool = COUNTING_ZONE_EDIT_ENABLED
+    exclusion_zone_display_enabled: bool = EXCLUSION_ZONE_DISPLAY_ENABLED
+    exclusion_zone_processing_enabled: bool = EXCLUSION_ZONE_PROCESSING_ENABLED
+    exclusion_zone_edit_enabled: bool = EXCLUSION_ZONE_EDIT_ENABLED
     class_selection_changed: bool = False
     pose_toggled: bool = False
     sahi_toggled: bool = False
@@ -68,6 +89,9 @@ class MenuState:
     threshold_changed: bool = False
     counting_zone_toggled: bool = False
     counting_zone_edit_toggled: bool = False
+    exclusion_zone_display_toggled: bool = False
+    exclusion_zone_processing_toggled: bool = False
+    exclusion_zone_edit_toggled: bool = False
     menu_process: mp.Process | None = None
     event_queue: mp.Queue = field(default_factory=mp.Queue, repr=False)
     command_queue: mp.Queue = field(default_factory=mp.Queue, repr=False)

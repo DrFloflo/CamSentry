@@ -20,6 +20,7 @@ class CountingZoneState:
     edit_enabled: bool = False
     points: ZonePoints = field(default_factory=lambda: list(COUNTING_ZONE_POINTS))
     frame_size: tuple[int, int] | None = None
+    print_name: str = "counting_zone_points"
 
 
 class CountingZoneEditor:
@@ -120,7 +121,7 @@ class CountingZoneEditor:
         printable_points = tuple(bounded_points)
         if print_change and printable_points != self._last_printed_points:
             self._last_printed_points = printable_points
-            print(f"counting_zone_points={list(printable_points)}")
+            print(f"{self.state.print_name}={list(printable_points)}")
 
     def _move_points(self, points: ZonePoints, dx: int, dy: int) -> ZonePoints:
         if not points:

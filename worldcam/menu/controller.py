@@ -9,6 +9,9 @@ from worldcam.menu.constants import (
     MENU_EVENT_CLOSED,
     MENU_EVENT_COUNTING_ZONE_EDIT,
     MENU_EVENT_COUNTING_ZONE_ENABLED,
+    MENU_EVENT_EXCLUSION_ZONE_DISPLAY,
+    MENU_EVENT_EXCLUSION_ZONE_EDIT,
+    MENU_EVENT_EXCLUSION_ZONE_PROCESSING,
     MENU_EVENT_POSE,
     MENU_EVENT_SAHI,
     MENU_EVENT_TRACKING,
@@ -38,6 +41,9 @@ def start_class_menu_window(class_names: list[str], selected_class_names: set[st
             menu_state.display_threshold,
             menu_state.counting_zone_enabled,
             menu_state.counting_zone_edit_enabled,
+            menu_state.exclusion_zone_display_enabled,
+            menu_state.exclusion_zone_processing_enabled,
+            menu_state.exclusion_zone_edit_enabled,
             menu_state.event_queue,
             menu_state.command_queue,
         ),
@@ -96,6 +102,15 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
             elif event_name == MENU_EVENT_COUNTING_ZONE_EDIT:
                 menu_state.counting_zone_edit_enabled = bool(payload)
                 menu_state.counting_zone_edit_toggled = True
+            elif event_name == MENU_EVENT_EXCLUSION_ZONE_DISPLAY:
+                menu_state.exclusion_zone_display_enabled = bool(payload)
+                menu_state.exclusion_zone_display_toggled = True
+            elif event_name == MENU_EVENT_EXCLUSION_ZONE_PROCESSING:
+                menu_state.exclusion_zone_processing_enabled = bool(payload)
+                menu_state.exclusion_zone_processing_toggled = True
+            elif event_name == MENU_EVENT_EXCLUSION_ZONE_EDIT:
+                menu_state.exclusion_zone_edit_enabled = bool(payload)
+                menu_state.exclusion_zone_edit_toggled = True
             elif event_name == MENU_EVENT_CLOSED:
                 menu_state.is_open = False
     except queue_module.Empty:
@@ -115,6 +130,9 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
         threshold_changed=menu_state.threshold_changed,
         counting_zone_toggled=menu_state.counting_zone_toggled,
         counting_zone_edit_toggled=menu_state.counting_zone_edit_toggled,
+        exclusion_zone_display_toggled=menu_state.exclusion_zone_display_toggled,
+        exclusion_zone_processing_toggled=menu_state.exclusion_zone_processing_toggled,
+        exclusion_zone_edit_toggled=menu_state.exclusion_zone_edit_toggled,
     )
     menu_state.class_selection_changed = False
     menu_state.pose_toggled = False
@@ -124,6 +142,9 @@ def consume_menu_changes(menu_state: MenuState, selected_class_names: set[str]) 
     menu_state.threshold_changed = False
     menu_state.counting_zone_toggled = False
     menu_state.counting_zone_edit_toggled = False
+    menu_state.exclusion_zone_display_toggled = False
+    menu_state.exclusion_zone_processing_toggled = False
+    menu_state.exclusion_zone_edit_toggled = False
     return changes
 
 
@@ -138,6 +159,9 @@ def snapshot_menu_state(menu_state: MenuState, selected_class_names: set[str]) -
         display_threshold=menu_state.display_threshold,
         counting_zone_enabled=menu_state.counting_zone_enabled,
         counting_zone_edit_enabled=menu_state.counting_zone_edit_enabled,
+        exclusion_zone_display_enabled=menu_state.exclusion_zone_display_enabled,
+        exclusion_zone_processing_enabled=menu_state.exclusion_zone_processing_enabled,
+        exclusion_zone_edit_enabled=menu_state.exclusion_zone_edit_enabled,
     )
 
 
@@ -181,5 +205,17 @@ def handle_class_menu_key(
     if key == ord("e"):
         menu_state.counting_zone_edit_enabled = not menu_state.counting_zone_edit_enabled
         return MenuChanges(counting_zone_edit_toggled=True)
+
+    if key == ord("x"):
+        menu_state.exclusion_zone_display_enabled = not menu_state.exclusion_zone_display_enabled
+        return MenuChanges(exclusion_zone_display_toggled=True)
+
+    if key == ord("c"):
+        menu_state.exclusion_zone_processing_enabled = not menu_state.exclusion_zone_processing_enabled
+        return MenuChanges(exclusion_zone_processing_toggled=True)
+
+    if key == ord("v"):
+        menu_state.exclusion_zone_edit_enabled = not menu_state.exclusion_zone_edit_enabled
+        return MenuChanges(exclusion_zone_edit_toggled=True)
 
     return MenuChanges()

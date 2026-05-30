@@ -11,6 +11,9 @@ MENU_EVENT_SEGMENTATION = "segmentation"
 MENU_EVENT_THRESHOLD = "threshold"
 MENU_EVENT_COUNTING_ZONE_ENABLED = "counting_zone_enabled"
 MENU_EVENT_COUNTING_ZONE_EDIT = "counting_zone_edit"
+MENU_EVENT_EXCLUSION_ZONE_DISPLAY = "exclusion_zone_display"
+MENU_EVENT_EXCLUSION_ZONE_PROCESSING = "exclusion_zone_processing"
+MENU_EVENT_EXCLUSION_ZONE_EDIT = "exclusion_zone_edit"
 MENU_EVENT_CLOSED = "closed"
 
 MenuEvent = tuple[str, object]

@@ -25,13 +25,15 @@ def run_model_analysis(
     segmentation_enabled: bool,
     sahi_enabled: bool = False,
     model_key: str = "",
+    exclusion_zone_points: ZonePoints | None = None,
+    exclusion_zone_enabled: bool = False,
 ) -> tuple[list[Detection], list[Pose], list[SegmentationMask], YOLO | None, YOLO | None]:
     """Run object and optional pose analysis while preserving previous results on errors."""
     try:
         if sahi_enabled:
-            latest_detections = run_sahi_analysis(frame, model, device, selected_class_names)
+            latest_detections = run_sahi_analysis(frame, model, device, selected_class_names, exclusion_zone_points, exclusion_zone_enabled)
         else:
-            latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
+            latest_detections = run_yolo_analysis(frame, model, device, selected_class_names, exclusion_zone_points, exclusion_zone_enabled)
     except Exception as exc:
         print(f"Erreur pendant l'analyse YOLO: {exc}")
 
@@ -84,6 +86,8 @@ def update_runtime_analysis(
     counting_zone_points: ZonePoints | None = None,
     counting_zone_enabled: bool = False,
     model_key: str = "",
+    exclusion_zone_points: ZonePoints | None = None,
+    exclusion_zone_enabled: bool = False,
 ) -> tuple[YOLO | None, YOLO | None]:
     """Run enabled analyses and refresh runtime result caches."""
     (
@@ -106,6 +110,8 @@ def update_runtime_analysis(
         segmentation_enabled,
         sahi_enabled,
         model_key,
+        exclusion_zone_points,
+        exclusion_zone_enabled,
     )
 
     runtime.latest_detections = deduplicate_detections(runtime.latest_detections)
