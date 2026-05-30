@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from worldcam.core.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, TARGET_FPS
-from worldcam.tests.stream_analysis_types import SourceProbe, StreamAnalysis
+from worldcam.tests.stream_analysis.stream_analysis_types import SourceProbe, StreamAnalysis
 
 
 def format_source_probe(source_probe: SourceProbe) -> list[str]:

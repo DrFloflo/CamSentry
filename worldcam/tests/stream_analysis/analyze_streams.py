@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 
-from worldcam.tests.stream_analysis_cli import parse_args, parse_profiles, select_streams
-from worldcam.tests.stream_analysis_metrics import analyze_stream
-from worldcam.tests.stream_analysis_probe import probe_source
-from worldcam.tests.stream_analysis_report import build_json_payload, format_report
-from worldcam.tests.stream_analysis_types import SourceProbe, StreamAnalysis
+from worldcam.tests.stream_analysis.stream_analysis_cli import parse_args, parse_profiles, select_streams
+from worldcam.tests.stream_analysis.stream_analysis_metrics import analyze_stream
+from worldcam.tests.stream_analysis.stream_analysis_probe import probe_source
+from worldcam.tests.stream_analysis.stream_analysis_report import build_json_payload, format_report
+from worldcam.tests.stream_analysis.stream_analysis_types import SourceProbe, StreamAnalysis
 
 
 def analyze_selected_streams(
