@@ -6,7 +6,7 @@ from ultralytics import YOLO
 
 from worldcam.core.config import SEGMENTATION_ALPHA, SEGMENTATION_CONTOUR_THICKNESS, SEGMENTATION_Y_OFFSET
 from worldcam.analysis.detection import get_detection_color
-from worldcam.core.models import run_resized_model_inference
+from worldcam.core.models import InferenceInput, run_prepared_model_inference, run_resized_model_inference
 
 SegmentationMask = tuple[np.ndarray, str, float]
 
@@ -54,9 +54,14 @@ def run_segmentation_analysis(
     segmentation_model: YOLO,
     device: str,
     selected_class_names: set[str],
+    inference_input: InferenceInput | None = None,
 ) -> list[SegmentationMask]:
     """Resize the frame, run YOLO segmentation inference, and return full-frame masks."""
-    inference = run_resized_model_inference(segmentation_model, frame, device)
+    inference = (
+        run_prepared_model_inference(segmentation_model, inference_input, device)
+        if inference_input is not None
+        else run_resized_model_inference(segmentation_model, frame, device)
+    )
     return extract_segmentation_masks(
         inference.results,
         segmentation_model,
@@ -68,18 +73,18 @@ def run_segmentation_analysis(
 
 def draw_segmentation_masks(frame: np.ndarray, segmentations: list[SegmentationMask], display_threshold: float = 0.5) -> None:
     """Draw translucent segmentation masks and thin contours on the displayed frame."""
-    if not segmentations:
+    visible_segmentations = [
+        (mask, label, confidence)
+        for mask, label, confidence in segmentations
+        if confidence >= display_threshold
+    ]
+    if not visible_segmentations:
         return
 
     overlay = frame.copy()
-    has_overlay = False
-    for mask, label, confidence in segmentations:
-        if confidence < display_threshold:
-            continue
-
+    for mask, label, confidence in visible_segmentations:
         color = get_detection_color(label.replace(" seg", ""))
         overlay[mask] = color
-        has_overlay = True
 
         contour_mask = mask.astype(np.uint8) * 255
         contours, _hierarchy = cv2.findContours(contour_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -99,5 +104,4 @@ def draw_segmentation_masks(frame: np.ndarray, segmentations: list[SegmentationM
                 1,
             )
 
-    if has_overlay:
-        cv2.addWeighted(overlay, SEGMENTATION_ALPHA, frame, 1.0 - SEGMENTATION_ALPHA, 0, frame)
+    cv2.addWeighted(overlay, SEGMENTATION_ALPHA, frame, 1.0 - SEGMENTATION_ALPHA, 0, frame)

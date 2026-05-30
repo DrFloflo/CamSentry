@@ -72,9 +72,12 @@ def draw_counting_zone(
         contour = np.array(points, dtype=np.int32)
         is_closed = len(points) >= 3
         if is_closed:
-            zone_overlay = frame.copy()
-            cv2.fillPoly(zone_overlay, [contour], (255, 255, 255))
-            cv2.addWeighted(zone_overlay, 0.12, frame, 0.88, 0, frame)
+            x, y, width, height = cv2.boundingRect(contour)
+            roi = frame[y : y + height, x : x + width]
+            zone_overlay = roi.copy()
+            shifted_contour = contour - np.array([x, y], dtype=np.int32)
+            cv2.fillPoly(zone_overlay, [shifted_contour], (255, 255, 255))
+            cv2.addWeighted(zone_overlay, 0.12, roi, 0.88, 0, roi)
         cv2.polylines(frame, [contour], is_closed, color, 1)
 
     if not counting_zone_edit_enabled:

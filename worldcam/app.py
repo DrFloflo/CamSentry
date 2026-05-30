@@ -22,6 +22,7 @@ from worldcam.core.models import load_yolo_model
 from worldcam.core.runtime import (
     RuntimeState,
     register_frame_received,
+    register_runtime_timing,
     register_stream_read,
     register_stream_read_failure,
     reset_analysis_state,
@@ -215,6 +216,7 @@ def main(argv: list[str] | None = None) -> None:
                     model_key,
                 )
 
+            overlay_started_at = time.perf_counter()
             draw_overlay(
                 frame,
                 runtime.latest_detections,
@@ -228,10 +230,13 @@ def main(argv: list[str] | None = None) -> None:
                 menu_snapshot.counting_zone_enabled,
                 menu_snapshot.counting_zone_edit_enabled,
             )
+            register_runtime_timing(runtime, "overlay", time.perf_counter() - overlay_started_at)
             if web_stream_server is not None:
                 web_stream_server.update_frame(frame)
 
+            throttle_started_at = time.perf_counter()
             runtime.next_frame_at = throttle_display(runtime.next_frame_at)
+            register_runtime_timing(runtime, "display_throttle", time.perf_counter() - throttle_started_at)
             key = -1
             if not args.headless:
                 cv2.imshow(MAIN_WINDOW_NAME, frame)

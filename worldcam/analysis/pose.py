@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from worldcam.core.models import run_resized_model_inference
+from worldcam.core.models import InferenceInput, run_prepared_model_inference, run_resized_model_inference
 from worldcam.core.config import (
     POSE_CONFIDENCE_THRESHOLD,
     POSE_KEYPOINT_COLOR,
@@ -36,9 +36,13 @@ def extract_pose_keypoints(results, scale_x: float, scale_y: float) -> list[Pose
     return poses
 
 
-def run_pose_analysis(frame: np.ndarray, pose_model: YOLO, device: str) -> list[Pose]:
+def run_pose_analysis(frame: np.ndarray, pose_model: YOLO, device: str, inference_input: InferenceInput | None = None) -> list[Pose]:
     """Resize the frame, run YOLO pose inference, and return poses for the original frame."""
-    inference = run_resized_model_inference(pose_model, frame, device)
+    inference = (
+        run_prepared_model_inference(pose_model, inference_input, device)
+        if inference_input is not None
+        else run_resized_model_inference(pose_model, frame, device)
+    )
     return extract_pose_keypoints(inference.results, inference.scale_x, inference.scale_y)
 
 

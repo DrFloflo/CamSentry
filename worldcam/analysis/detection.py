@@ -15,7 +15,7 @@ from worldcam.core.config import (
     SAHI_SLICE_HEIGHT,
     SAHI_SLICE_WIDTH,
 )
-from worldcam.core.models import run_model_inference, run_resized_model_inference
+from worldcam.core.models import InferenceInput, run_model_inference, run_prepared_model_inference, run_resized_model_inference
 
 Detection = tuple[int, int, int, int, str, float]
 
@@ -57,9 +57,14 @@ def run_yolo_analysis(
     model: YOLO,
     device: str,
     selected_class_names: set[str],
+    inference_input: InferenceInput | None = None,
 ) -> list[Detection]:
     """Resize the frame, run YOLO inference, and return detections for the original frame."""
-    inference = run_resized_model_inference(model, frame, device)
+    inference = (
+        run_prepared_model_inference(model, inference_input, device)
+        if inference_input is not None
+        else run_resized_model_inference(model, frame, device)
+    )
     return extract_yolo_detections(
         inference.results,
         model,

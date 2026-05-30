@@ -1,12 +1,14 @@
 """Analysis orchestration helpers for the WorldCam main loop."""
 
+import time
+
 from ultralytics import YOLO
 
 from worldcam.analysis.counting_zone import ZonePoints
 from worldcam.analysis.detection import Detection, deduplicate_detections, run_sahi_analysis, run_yolo_analysis
-from worldcam.core.models import load_pose_model, load_segmentation_model
+from worldcam.core.models import InferenceInput, load_pose_model, load_segmentation_model, prepare_inference_input
 from worldcam.analysis.pose import Pose, run_pose_analysis
-from worldcam.core.runtime import RuntimeState
+from worldcam.core.runtime import RuntimeState, register_runtime_timing
 from worldcam.analysis.segmentation import SegmentationMask, run_segmentation_analysis
 from worldcam.analysis.tracking import ObjectTracker
 
@@ -27,11 +29,13 @@ def run_model_analysis(
     model_key: str = "",
 ) -> tuple[list[Detection], list[Pose], list[SegmentationMask], YOLO | None, YOLO | None]:
     """Run object and optional pose analysis while preserving previous results on errors."""
+    inference_input: InferenceInput | None = None
     try:
         if sahi_enabled:
             latest_detections = run_sahi_analysis(frame, model, device, selected_class_names)
         else:
-            latest_detections = run_yolo_analysis(frame, model, device, selected_class_names)
+            inference_input = prepare_inference_input(frame)
+            latest_detections = run_yolo_analysis(frame, model, device, selected_class_names, inference_input)
     except Exception as exc:
         print(f"Erreur pendant l'analyse YOLO: {exc}")
 
@@ -44,7 +48,9 @@ def run_model_analysis(
                 latest_segmentations = []
         if segmentation_model is not None:
             try:
-                latest_segmentations = run_segmentation_analysis(frame, segmentation_model, device, selected_class_names)
+                if inference_input is None:
+                    inference_input = prepare_inference_input(frame)
+                latest_segmentations = run_segmentation_analysis(frame, segmentation_model, device, selected_class_names, inference_input)
             except Exception as exc:
                 print(f"Erreur pendant l'analyse de segmentation YOLO: {exc}")
     else:
@@ -61,7 +67,9 @@ def run_model_analysis(
             return latest_detections, latest_poses, latest_segmentations, pose_model, segmentation_model
 
     try:
-        latest_poses = run_pose_analysis(frame, pose_model, device)
+        if inference_input is None:
+            inference_input = prepare_inference_input(frame)
+        latest_poses = run_pose_analysis(frame, pose_model, device, inference_input)
     except Exception as exc:
         print(f"Erreur pendant l'analyse de pose YOLO: {exc}")
 
@@ -86,6 +94,7 @@ def update_runtime_analysis(
     model_key: str = "",
 ) -> tuple[YOLO | None, YOLO | None]:
     """Run enabled analyses and refresh runtime result caches."""
+    model_analysis_started_at = time.perf_counter()
     (
         runtime.latest_detections,
         runtime.latest_poses,
@@ -107,11 +116,16 @@ def update_runtime_analysis(
         sahi_enabled,
         model_key,
     )
+    register_runtime_timing(runtime, "model_analysis", time.perf_counter() - model_analysis_started_at)
 
+    dedup_started_at = time.perf_counter()
     runtime.latest_detections = deduplicate_detections(runtime.latest_detections)
+    register_runtime_timing(runtime, "dedup", time.perf_counter() - dedup_started_at)
 
     if tracking_enabled:
+        tracking_started_at = time.perf_counter()
         runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections, counting_zone_points, counting_zone_enabled)
+        register_runtime_timing(runtime, "tracking", time.perf_counter() - tracking_started_at)
     else:
         runtime.latest_object_tracks = []
 

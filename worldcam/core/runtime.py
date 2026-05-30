@@ -22,6 +22,8 @@ class RuntimeState:
     slow_reads: int = 0
     stale_reads: int = 0
     stream_read_failures: int = 0
+    timing_totals: dict[str, float] = field(default_factory=dict)
+    timing_counts: dict[str, int] = field(default_factory=dict)
     started_at: float = field(default_factory=time.perf_counter)
     last_stats_at: float = field(default_factory=time.perf_counter)
     next_frame_at: float = field(default_factory=time.perf_counter)
@@ -52,6 +54,27 @@ def register_stream_read_failure(runtime: RuntimeState, max_failures: int) -> bo
     return runtime.stream_read_failures >= max_failures
 
 
+def register_runtime_timing(runtime: RuntimeState, name: str, duration: float) -> None:
+    """Accumulate lightweight performance timings for periodic diagnostics."""
+    runtime.timing_totals[name] = runtime.timing_totals.get(name, 0.0) + duration
+    runtime.timing_counts[name] = runtime.timing_counts.get(name, 0) + 1
+
+
+def format_runtime_timings(runtime: RuntimeState) -> str:
+    """Return average timings in milliseconds, then reset the interval counters."""
+    if not runtime.timing_totals:
+        return ""
+
+    timing_parts = []
+    for name in sorted(runtime.timing_totals):
+        count = max(1, runtime.timing_counts.get(name, 0))
+        average_ms = runtime.timing_totals[name] / count * 1000.0
+        timing_parts.append(f"{name}={average_ms:.1f}ms")
+    runtime.timing_totals.clear()
+    runtime.timing_counts.clear()
+    return ", timings_moyens=(" + ", ".join(timing_parts) + ")"
+
+
 def register_frame_received(runtime: RuntimeState, read_duration: float, frame_age: float | None = None) -> None:
     """Update fresh-frame counters, FPS, and periodic stream statistics."""
     runtime.stream_read_failures = 0
@@ -69,9 +92,10 @@ def register_frame_received(runtime: RuntimeState, read_duration: float, frame_a
         elapsed = now - runtime.started_at
         average_fps = runtime.frame_count / elapsed if elapsed > 0 else 0.0
         age_text = "n/a" if frame_age is None else f"{frame_age:.3f}s"
+        timing_text = format_runtime_timings(runtime)
         print(
             f"Stats flux: frames={runtime.frame_count}, fps_moyen={average_fps:.1f}, "
             f"lectures_lentes={runtime.slow_reads}, lectures_obsoletes={runtime.stale_reads}, "
-            f"derniere_lecture={read_duration:.3f}s, age_frame={age_text}"
+            f"derniere_lecture={read_duration:.3f}s, age_frame={age_text}{timing_text}"
         )
         runtime.last_stats_at = now

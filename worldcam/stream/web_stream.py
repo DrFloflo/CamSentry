@@ -43,9 +43,9 @@ class FrameBuffer:
         self._encoder_thread.start()
 
     def update(self, frame) -> None:
-        """Store the newest annotated frame without blocking the analysis loop on JPEG encoding."""
+        """Store the newest annotated frame reference without blocking on JPEG encoding."""
         with self._condition:
-            self._latest_frame = frame.copy()
+            self._latest_frame = frame
             self._latest_raw_frame_id += 1
             self._condition.notify_all()
 

@@ -17,6 +17,19 @@ from worldcam.core.config import DEFAULT_MODEL_KEY, INFERENCE_WIDTH, MODEL_BACKE
 
 
 @dataclass(frozen=True)
+class InferenceInput:
+    """Prepared resized frame and scaling metadata shared by per-frame YOLO analyses."""
+
+    image: np.ndarray
+    scale_x: float
+    scale_y: float
+    frame_width: int
+    frame_height: int
+    inference_width: int
+    inference_height: int
+
+
+@dataclass(frozen=True)
 class ResizedInferenceResult:
     """YOLO inference output with metadata for original-frame scaling."""
 
@@ -77,16 +90,14 @@ def run_model_inference(model: YOLO, image: np.ndarray, device: str):
     return model(image, verbose=False, device=device)[0]
 
 
-def run_resized_model_inference(model: YOLO, frame: np.ndarray, device: str) -> ResizedInferenceResult:
-    """Resize a frame to the common inference width, run YOLO, and return scaling metadata."""
+def prepare_inference_input(frame: np.ndarray) -> InferenceInput:
+    """Resize a frame once and return scaling metadata reusable across YOLO models."""
     frame_h, frame_w, _ = frame.shape
     new_width = min(INFERENCE_WIDTH, frame_w)
     new_height = int(frame_h * (new_width / frame_w))
     resized_frame = cv2.resize(frame, (new_width, new_height))
-
-    results = run_model_inference(model, resized_frame, device)
-    return ResizedInferenceResult(
-        results=results,
+    return InferenceInput(
+        image=resized_frame,
         scale_x=frame_w / new_width,
         scale_y=frame_h / new_height,
         frame_width=frame_w,
@@ -94,6 +105,25 @@ def run_resized_model_inference(model: YOLO, frame: np.ndarray, device: str) -> 
         inference_width=new_width,
         inference_height=new_height,
     )
+
+
+def run_prepared_model_inference(model: YOLO, inference_input: InferenceInput, device: str) -> ResizedInferenceResult:
+    """Run YOLO on a prepared frame and return the shared scaling metadata."""
+    results = run_model_inference(model, inference_input.image, device)
+    return ResizedInferenceResult(
+        results=results,
+        scale_x=inference_input.scale_x,
+        scale_y=inference_input.scale_y,
+        frame_width=inference_input.frame_width,
+        frame_height=inference_input.frame_height,
+        inference_width=inference_input.inference_width,
+        inference_height=inference_input.inference_height,
+    )
+
+
+def run_resized_model_inference(model: YOLO, frame: np.ndarray, device: str) -> ResizedInferenceResult:
+    """Resize a frame to the common inference width, run YOLO, and return scaling metadata."""
+    return run_prepared_model_inference(model, prepare_inference_input(frame), device)
 
 
 def warm_up_model(model: YOLO, label: str, device: str) -> None:
