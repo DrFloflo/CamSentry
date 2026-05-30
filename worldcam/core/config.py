@@ -1,23 +1,10 @@
 """Shared configuration for the WorldCam analysis pipeline."""
 
-STREAM_URLS = [
-    (
-        "https://videos-3.earthcam.com/fecnetwork/22172.flv/playlist.m3u8?"
-        "t=pOGmzuDAmYSX7knfXlDLzYSXAgLsxTkQOagDzUD/U1NsjqCkLWUOMbS9PlyNFjKC&td=202605201348"
-    ),
-    (
-        "https://videos-3.earthcam.com/fecnetwork/24322.flv/playlist.m3u8?"
-        "t=qAP3aum0UbcBtTuO%2Fx%2F7Lz9UytxcCWnrPDJyjgaIxep8QE4xtRu4RMqXEWHwdbnk&td=202605160341"
-    ),
-    (
-        "https://videos-3.earthcam.com/fecnetwork/24935.flv/playlist.m3u8?"
-        "t=mexLmPaUse3br05vrUOgWmHCY3zSSIm2XkB8hKYeViSUXzq/1zkE4DlQHFYGtVec&td=202605161011"
-    ),
-    (
-        "https://videos-3.earthcam.com/fecnetwork/14320.flv/playlist.m3u8?"
-        "t=tBywzTYURGbEtGxF1LfyCkm5AvmWDkmIcwUf7arKv5SWW6J7OwYDRnqeU6TNfEfx&td=202605161018"
-    ),
-]
+STREAM_URL = (
+    "https://videos-3.earthcam.com/fecnetwork/22172.flv/playlist.m3u8?"
+    "t=pOGmzuDAmYSX7knfXlDLzYSXAgLsxTkQOagDzUD/U1NsjqCkLWUOMbS9PlyNFjKC&td=202605201348"
+)
+STREAM_URLS = [STREAM_URL]
 
 OUTPUT_WIDTH = 1280
 OUTPUT_HEIGHT = 720

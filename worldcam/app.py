@@ -14,7 +14,7 @@ from worldcam.core.config import (
     MAX_STREAM_READ_FAILURES,
     SAHI_ENABLED,
     STREAM_READ_TIMEOUT_SECONDS,
-    STREAM_URLS,
+    STREAM_URL,
 )
 from worldcam.analysis.counting_zone import CountingZoneEditor
 from worldcam.display.display_runtime import cleanup_resources, draw_overlay, throttle_display
@@ -25,16 +25,13 @@ from worldcam.core.runtime import (
     register_stream_read,
     register_stream_read_failure,
     reset_analysis_state,
-    reset_stream_statistics,
 )
 from worldcam.stream.streaming import configure_ffmpeg_http_headers, print_videoio_diagnostics
-from worldcam.stream.stream_control import open_stream_resources_with_retry, reconnect_current_stream, switch_stream
+from worldcam.stream.stream_control import open_stream_resources_with_retry, reconnect_current_stream
 from worldcam.analysis.tracking import ObjectTracker
 from worldcam.display.ui import MenuState, close_class_menu_window, consume_menu_changes, handle_class_menu_key, snapshot_menu_state
 from worldcam.stream.web_stream import WebStreamServer, start_web_stream_server
 
-KEY_LEFT_VALUES = {81, 2424832}
-KEY_RIGHT_VALUES = {83, 2555904}
 MAIN_WINDOW_NAME = "Analyse Image - Earth cam"
 
 
@@ -117,20 +114,16 @@ def main(argv: list[str] | None = None) -> None:
     """Run the WorldCam analysis application."""
     args = parse_args(argv)
     configure_ffmpeg_http_headers()
-    if not STREAM_URLS:
-        print("Erreur : aucun stream configuré dans STREAM_URLS.")
-        return
-
-    stream_total = len(STREAM_URLS)
+    stream_total = 1
     stream_index = 0
-    print_videoio_diagnostics(STREAM_URLS[stream_index])
+    print_videoio_diagnostics(STREAM_URL)
 
     model_key = args.model.strip().removeprefix("yolo")
     model, device = load_yolo_model(model_key)
     pose_model = None
     segmentation_model = None
 
-    resources = open_stream_resources_with_retry(STREAM_URLS[stream_index], stream_index, stream_total)
+    resources = open_stream_resources_with_retry(STREAM_URL, stream_index, stream_total)
 
     runtime = RuntimeState()
     object_tracker = ObjectTracker()
@@ -223,12 +216,6 @@ def main(argv: list[str] | None = None) -> None:
                 key = cv2.waitKeyEx(1)
                 if key == ord("q"):
                     break
-            if key in KEY_LEFT_VALUES or key in KEY_RIGHT_VALUES:
-                step = -1 if key in KEY_LEFT_VALUES else 1
-                resources, stream_index = switch_stream(resources, stream_index, step, stream_total)
-                reset_analysis_state(runtime, object_tracker)
-                reset_stream_statistics(runtime)
-                continue
             handle_menu_changes(
                 key,
                 class_names,

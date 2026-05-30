@@ -13,7 +13,6 @@ from worldcam.analysis.pose import Pose, draw_pose_detections
 from worldcam.analysis.segmentation import SegmentationMask, draw_segmentation_masks
 from worldcam.stream.stream_control import release_stream_resources
 from worldcam.analysis.tracking import ObjectTrack, draw_object_tracks, draw_vehicle_counts
-from worldcam.display.ui import draw_stream_counter
 
 ZonePoints = list[tuple[int, int]]
 
@@ -52,7 +51,6 @@ def draw_overlay(
     else:
         draw_yolo_detections(frame, detections, display_threshold)
     draw_pose_detections(frame, poses)
-    draw_stream_counter(frame, stream_index, stream_total)
     draw_vehicle_counts(frame, vehicle_counts)
     draw_counting_zone(frame, counting_zone_points, counting_zone_enabled, counting_zone_edit_enabled)
     draw_timestamp(frame)
