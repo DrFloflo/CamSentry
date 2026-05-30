@@ -114,6 +114,5 @@ def update_runtime_analysis(
         runtime.latest_object_tracks = object_tracker.update(runtime.latest_detections, counting_zone_points, counting_zone_enabled)
     else:
         runtime.latest_object_tracks = []
-        object_tracker.reset()
 
     return pose_model, segmentation_model

@@ -110,6 +110,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def reconnect_stream_after_failure(
+    resources,
+    runtime: RuntimeState,
+    object_tracker: ObjectTracker,
+    stream_index: int,
+    stream_total: int,
+    message: str,
+):
+    """Reconnect the current stream and clear cached analysis state."""
+    print(message)
+    resources = reconnect_current_stream(resources, stream_index, stream_total)
+    runtime.stream_read_failures = 0
+    reset_analysis_state(runtime, object_tracker)
+    return resources
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the WorldCam analysis application."""
     args = parse_args(argv)
@@ -150,20 +166,28 @@ def main(argv: list[str] | None = None) -> None:
                 if not register_stream_read_failure(runtime, MAX_STREAM_READ_FAILURES):
                     continue
 
-                print("Reconnexion en cours...")
-                resources = reconnect_current_stream(resources, stream_index, stream_total)
-                runtime.stream_read_failures = 0
-                reset_analysis_state(runtime, object_tracker)
+                resources = reconnect_stream_after_failure(
+                    resources,
+                    runtime,
+                    object_tracker,
+                    stream_index,
+                    stream_total,
+                    "Reconnexion en cours...",
+                )
                 continue
 
             if reader_stats.stale:
                 if not register_stream_read_failure(runtime, MAX_STREAM_READ_FAILURES):
                     continue
 
-                print("Flux obsolète: reconnexion en cours...")
-                resources = reconnect_current_stream(resources, stream_index, stream_total)
-                runtime.stream_read_failures = 0
-                reset_analysis_state(runtime, object_tracker)
+                resources = reconnect_stream_after_failure(
+                    resources,
+                    runtime,
+                    object_tracker,
+                    stream_index,
+                    stream_total,
+                    "Flux obsolète: reconnexion en cours...",
+                )
                 continue
 
             register_frame_received(runtime, read_duration, reader_stats.latest_frame_age_seconds)
@@ -198,8 +222,6 @@ def main(argv: list[str] | None = None) -> None:
                 runtime.latest_segmentations,
                 menu_snapshot.display_threshold,
                 runtime.latest_object_tracks,
-                stream_index,
-                stream_total,
                 object_tracker.vehicle_counts,
                 menu_snapshot.tracking_enabled,
                 counting_zone_editor.points,

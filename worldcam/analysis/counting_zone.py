@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import cv2
+import numpy as np
 
 from worldcam.core.config import COUNTING_ZONE_HANDLE_RADIUS, COUNTING_ZONE_POINTS
 
@@ -150,8 +151,6 @@ class CountingZoneEditor:
     def _opencv_contour(self):
         if len(self.state.points) < 3:
             return None
-        import numpy as np
-
         return np.array(self.state.points, dtype=np.int32)
 
     def _bounded_point(self, x: int, y: int) -> Point:
@@ -176,8 +175,6 @@ def point_inside_zone(point: Point, zone_points: ZonePoints) -> bool:
     """Return whether a point is inside a closed counting-zone polygon."""
     if len(zone_points) < 3:
         return False
-
-    import numpy as np
 
     contour = np.array(zone_points, dtype=np.int32)
     return cv2.pointPolygonTest(contour, point, False) >= 0

@@ -4,6 +4,7 @@ import subprocess
 import time
 
 import cv2
+import numpy as np
 import torch
 from ultralytics import YOLO
 
@@ -36,8 +37,6 @@ def draw_overlay(
     segmentations: list[SegmentationMask],
     display_threshold: float,
     object_tracks: list[ObjectTrack],
-    stream_index: int,
-    stream_total: int,
     vehicle_counts: dict[str, int],
     tracking_enabled: bool,
     counting_zone_points: ZonePoints | None = None,
@@ -70,8 +69,6 @@ def draw_counting_zone(
 
     color = COUNTING_ZONE_EDIT_COLOR if counting_zone_edit_enabled else COUNTING_ZONE_COLOR
     if len(points) >= 2:
-        import numpy as np
-
         contour = np.array(points, dtype=np.int32)
         is_closed = len(points) >= 3
         if is_closed:

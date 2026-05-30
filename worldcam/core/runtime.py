@@ -38,20 +38,6 @@ def reset_analysis_state(runtime: RuntimeState, object_tracker: ObjectTracker) -
     object_tracker.reset()
 
 
-def reset_stream_statistics(runtime: RuntimeState) -> None:
-    """Reset frame counters and timing statistics for a fresh stream."""
-    now = time.perf_counter()
-    runtime.frame_count = 0
-    runtime.slow_reads = 0
-    runtime.stale_reads = 0
-    runtime.stream_read_failures = 0
-    runtime.started_at = now
-    runtime.last_stats_at = now
-    runtime.next_frame_at = now
-    runtime.last_frame_at = now
-    runtime.current_fps = 0.0
-
-
 def register_stream_read(runtime: RuntimeState, read_duration: float) -> None:
     """Update slow-read diagnostics for one stream read attempt."""
     if read_duration > READ_WARN_SECONDS:

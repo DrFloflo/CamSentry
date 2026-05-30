@@ -1,8 +1,5 @@
 """On-screen display and keyboard interaction helpers."""
 
-import cv2
-import numpy as np
-
 from worldcam.menu import (
     MenuChanges,
     MenuSnapshot,

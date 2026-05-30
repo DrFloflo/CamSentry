@@ -20,22 +20,12 @@ from worldcam.core.config import (
 )
 from worldcam.analysis.count_persistence import VehicleCountStore
 from worldcam.analysis.counting_zone import ZonePoints, point_inside_zone
-from worldcam.analysis.detection import Detection, get_detection_color
+from worldcam.analysis.detection import Detection, get_detection_class_name, get_detection_color
 
 VEHICLE_SOURCE_CLASSES = {"car", "truck", "bus", "motorcycle"}
 VEHICLE_COUNT_KEY = "vehicle"
 VEHICLE_COUNT_MIN_HITS = 3
 ACTIVE_TRACK_OVERLAP_IOU_THRESHOLD = 0.80
-
-
-@dataclass
-class CountedVehicle:
-    """Short-lived memory for a vehicle that was already counted."""
-
-    class_name: str
-    bbox: tuple[int, int, int, int]
-    track_id: int | None = None
-    age: int = 0
 
 
 def estimate_track_speed_kmh(track: "ObjectTrack", zone_points: ZonePoints) -> float | None:
@@ -96,12 +86,7 @@ class VehicleCounter:
     def __init__(self) -> None:
         self.count_store = VehicleCountStore()
         self.counts = {VEHICLE_COUNT_KEY: self.count_store.total()}
-        self.counted_memory: list[CountedVehicle] = []
         self.count_date = self.count_store.current_date
-
-    def reset_memory(self) -> None:
-        """Clear compatibility memory without resetting cumulative counts."""
-        self.counted_memory.clear()
 
     def reset_daily_counts_if_needed(self) -> None:
         """Reset vehicle counts when the local calendar day changes, logging the previous total first."""
@@ -113,12 +98,7 @@ class VehicleCounter:
         print(f"Daily vehicle counter reset: date={self.count_date.isoformat()}, vehicles_counted={previous_total}")
         restored_total = self.count_store.open_day(current_date)
         self.counts[VEHICLE_COUNT_KEY] = restored_total
-        self.counted_memory.clear()
         self.count_date = current_date
-
-    def age_counted_memory(self) -> None:
-        """Keep the legacy compatibility hook without suppressing future vehicles."""
-        self.counted_memory.clear()
 
     def update_counts(self, tracks: list[ObjectTrack], counting_zone_points: ZonePoints | None = None, counting_zone_enabled: bool = False) -> None:
         """Count each confirmed vehicle track once, optionally only when its center is inside the counting zone."""
@@ -137,23 +117,6 @@ class VehicleCounter:
                 speed_kmh=speed_kmh,
             )
             track.counted = True
-
-    def refresh_counted_memory(self, tracks: list[ObjectTrack]) -> None:
-        """Keep the legacy compatibility hook without suppressing future vehicles."""
-        self.counted_memory.clear()
-
-    def is_recently_counted(self, class_name: str, bbox: tuple[int, int, int, int]) -> bool:
-        """Return whether a matching vehicle was already counted recently."""
-        return False
-
-    def remember_counted(self, track: ObjectTrack) -> None:
-        """Keep the legacy compatibility hook without suppressing future vehicles."""
-
-
-def get_detection_class_name(detection: Detection) -> str:
-    """Extract the class name from a WorldCam detection label."""
-    return detection[4].rsplit(" ", 1)[0]
-
 
 def are_compatible_track_classes(track_class_name: str, detection_class_name: str) -> bool:
     """Return whether a detection can update an existing track despite label jitter."""
@@ -223,7 +186,6 @@ class ObjectTracker:
             print(f"Tracking objects: reset active_ids={sorted(self.tracks)}")
         self.tracks.clear()
         self.next_track_id = 1
-        self.vehicle_counter.reset_memory()
 
     def update(
         self,
@@ -233,7 +195,6 @@ class ObjectTracker:
     ) -> list[ObjectTrack]:
         """Update tracks from the latest selected detections and return active tracks."""
         self.vehicle_counter.reset_daily_counts_if_needed()
-        self.vehicle_counter.age_counted_memory()
         object_boxes = [
             (x1, y1, x2, y2, confidence, get_detection_class_name(detection))
             for detection in detections
@@ -294,7 +255,6 @@ class ObjectTracker:
         self.suppress_overlapping_active_tracks()
         active_tracks = self.active_tracks()
         self.vehicle_counter.update_counts(active_tracks, counting_zone_points, counting_zone_enabled)
-        self.vehicle_counter.refresh_counted_memory(active_tracks)
 
         if PERSON_TRACK_DEBUG:
             print(
@@ -389,7 +349,3 @@ def draw_vehicle_counts(frame: np.ndarray, vehicle_counts: dict[str, int]) -> No
         y += line_height
 
 
-# Compatibility aliases for external callers using the previous person-centric names.
-PersonTrack = ObjectTrack
-PersonTracker = ObjectTracker
-draw_person_tracks = draw_object_tracks

@@ -52,7 +52,6 @@ class MenuState:
     """Mutable state for the YOLO class selection menu."""
 
     is_open: bool = False
-    index: int = 0
     pose_enabled: bool = False
     sahi_enabled: bool = SAHI_ENABLED
     tracking_enabled: bool = PERSON_TRACK_ENABLED
